@@ -13,6 +13,8 @@ import ParentDashboard from "../screens/parent/ParentDashboard";
 import DriverDashboard from "../screens/driver/DriverDashboard";
 import DriverSelectBusScreen from "../screens/driver/DriverSelectBusScreen";
 import TrackMapScreen from "../screens/parent/TrackMapScreen";
+import StaffDashboardScreen from "../screens/driver/StaffDashboardScreen";
+import StaffLiveTrackingScreen from "../screens/driver/StaffLiveTrackingScreen";
 
 const Tab = createBottomTabNavigator();
 
@@ -25,12 +27,14 @@ const MainTabNavigator = () => {
             case 'ADMIN': return AdminDashboard;
             case 'DRIVER': return DriverDashboard;
             case 'PARENT': return ParentDashboard;
+            case 'STAFF': return StaffDashboardScreen;
             default: return HomeScreen;
         }
     };
 
     const getBusComponent = () => {
         if (role === 'DRIVER') return DriverSelectBusScreen;
+        if (role === 'STAFF') return StaffLiveTrackingScreen;
         return ParentDashboard;
     };
 

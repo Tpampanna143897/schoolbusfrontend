@@ -69,7 +69,16 @@ const ParentStudentDetails = ({ route, navigation }) => {
                 )}
 
                 <View style={styles.detailsCard}>
-                    <Text style={styles.cardTitle}>Attendance Summary</Text>
+                    <View style={styles.cardHeaderRow}>
+                        <Text style={styles.cardTitle}>Attendance Summary</Text>
+                        <TouchableOpacity
+                            style={styles.historyBtn}
+                            onPress={() => navigation.navigate("ParentCalendar", { studentId: student._id })}
+                        >
+                            <Text style={styles.historyBtnText}>View History</Text>
+                            <Ionicons name="calendar-outline" size={14} color="#4c51bf" />
+                        </TouchableOpacity>
+                    </View>
                     {loading ? (
                         <ActivityIndicator color="#4c51bf" />
                     ) : (
@@ -128,6 +137,9 @@ const styles = StyleSheet.create({
     statItem: { alignItems: 'center', flex: 1 },
     statValue: { fontSize: 22, fontWeight: 'bold', color: '#4c51bf' },
     statLabel: { fontSize: 12, color: '#a0aec0', marginTop: 4 },
+    cardHeaderRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 15 },
+    historyBtn: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#f0f0ff', paddingHorizontal: 10, paddingVertical: 4, borderRadius: 8 },
+    historyBtnText: { color: '#4c51bf', fontSize: 12, fontWeight: 'bold', marginRight: 5 },
     trackBtn: { position: 'absolute', bottom: 30, left: 20, right: 20, backgroundColor: '#4c51bf', flexDirection: 'row', justifyContent: 'center', alignItems: 'center', padding: 18, borderRadius: 16, elevation: 8 },
     disabledBtn: { backgroundColor: '#a0aec0' },
     trackBtnText: { color: 'white', fontWeight: 'bold', fontSize: 18, marginLeft: 10 },

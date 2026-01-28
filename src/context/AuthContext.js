@@ -20,7 +20,14 @@ export const AuthProvider = ({ children }) => {
                 if (storedToken && storedRole) {
                     setToken(storedToken);
                     setRole(storedRole);
-                    // Optionally fetch user profile here
+
+                    // Fetch full user profile to populate context
+                    try {
+                        const res = await client.get("/auth/me");
+                        setUser(res.data);
+                    } catch (err) {
+                        console.error("Failed to fetch profile during load", err);
+                    }
                 }
             } catch (error) {
                 console.error("Auth load failed", error);
@@ -35,13 +42,14 @@ export const AuthProvider = ({ children }) => {
         try {
             const res = await client.post("/auth/login", { email, password });
 
-            const { token, role } = res.data;
+            const { token, role, user } = res.data;
 
             await SecureStore.setItemAsync("token", token);
             await SecureStore.setItemAsync("role", role);
 
             setToken(token);
             setRole(role);
+            setUser(user);
 
             return { success: true };
         } catch (error) {

@@ -7,6 +7,10 @@ const { width, height } = Dimensions.get('window');
 
 import { decodePolyline } from '../utils/polyline';
 
+import MapViewDirections from 'react-native-maps-directions';
+
+const GOOGLE_MAPS_APIKEY = "AIzaSyAu6yiOEH5Bo0ovfMKFvJ-_RS_Kgl-Qgn8"; // From app.json
+
 const MapComponent = ({
     busLocation,
     busDetails,
@@ -18,20 +22,28 @@ const MapComponent = ({
     connectionStatus = 'Connected',
     lastUpdated = '',
     onCenterPress,
+    routeStops = [], // [{ name, lat, lng }]
+    showRoute = true,
 }) => {
     const mapRef = useRef(null);
     const [followsBus, setFollowsBus] = useState(true);
+    const [displayRoute, setDisplayRoute] = useState(showRoute);
 
     // Memoize Polyline Decoding
     const decodedCoords = useMemo(() => {
         return polyline ? decodePolyline(polyline) : [];
     }, [polyline]);
 
-    // Safety check for polyline coordinates - Memoized for performance
+    // Safety check for polyline coordinates
     const validRouteCoords = useMemo(() => {
         const combined = [...decodedCoords, ...routeCoordinates];
         return combined.filter(c => c && typeof c.latitude === 'number' && typeof c.longitude === 'number');
     }, [decodedCoords, routeCoordinates]);
+
+    // Format stops for Directions
+    const origin = (routeStops && routeStops.length > 0) ? { latitude: routeStops[0].lat, longitude: routeStops[0].lng } : null;
+    const destination = (routeStops && routeStops.length > 1) ? { latitude: routeStops[routeStops.length - 1].lat, longitude: routeStops[routeStops.length - 1].lng } : null;
+    const waypoints = (routeStops && routeStops.length > 2) ? routeStops.slice(1, -1).map(s => ({ latitude: s.lat, longitude: s.lng })) : [];
 
     // Smooth Animated Coordinate state
     const [animatedCoordinate] = useState(new AnimatedRegion({
@@ -43,15 +55,13 @@ const MapComponent = ({
 
     useEffect(() => {
         if (busLocation && typeof busLocation.latitude === 'number' && typeof busLocation.longitude === 'number') {
-            // Animate marker to new position
             animatedCoordinate.timing({
                 latitude: busLocation.latitude,
                 longitude: busLocation.longitude,
                 duration: 1000,
-                useNativeDriver: false // AnimatedRegion doesn't support native driver
+                useNativeDriver: false
             }).start();
 
-            // Animate camera if following
             if (followsBus) {
                 mapRef.current?.animateCamera({
                     center: {
@@ -64,38 +74,35 @@ const MapComponent = ({
         }
     }, [busLocation, followsBus]);
 
-    // ... handleZoom logic (unchanged)
-
     const handleZoomIn = () => {
         mapRef.current?.getCamera().then(camera => {
-            mapRef.current?.animateCamera({ zoom: camera.zoom + 1 });
+            mapRef.current?.animateCamera({ zoom: (camera.zoom || 15) + 1 });
         });
     };
 
     const handleZoomOut = () => {
         mapRef.current?.getCamera().then(camera => {
-            mapRef.current?.animateCamera({ zoom: camera.zoom - 1 });
+            mapRef.current?.animateCamera({ zoom: (camera.zoom || 15) - 1 });
         });
     };
 
     const handleToggleFollow = () => {
         setFollowsBus(!followsBus);
         if (!followsBus && busLocation) {
-            mapRef.current?.animateCamera({
-                center: {
-                    latitude: busLocation.latitude,
-                    longitude: busLocation.longitude,
-                },
-                zoom: 17,
-            }, { duration: 500 });
+            mapRef.current?.animateToRegion({
+                latitude: busLocation.latitude,
+                longitude: busLocation.longitude,
+                latitudeDelta: 0.005,
+                longitudeDelta: 0.005,
+            }, 500);
         }
     };
 
     const initialRegion = {
         latitude: busLocation?.latitude || 12.9716,
         longitude: busLocation?.longitude || 77.5946,
-        latitudeDelta: 0.005,
-        longitudeDelta: 0.005,
+        latitudeDelta: 0.01,
+        longitudeDelta: 0.01,
     };
 
     return (
@@ -113,14 +120,44 @@ const MapComponent = ({
                 rotateEnabled={true}
                 toolbarEnabled={false}
             >
-                {/* Route Polyline */}
-                {validRouteCoords.length > 0 && (
+                {/* Directions API Polyline */}
+                {displayRoute && origin && destination && (
+                    <MapViewDirections
+                        origin={origin}
+                        destination={destination}
+                        waypoints={waypoints}
+                        apikey={GOOGLE_MAPS_APIKEY}
+                        strokeWidth={4}
+                        strokeColor="#4c51bf"
+                        optimizeWaypoints={true}
+                        onReady={result => {
+                            if (!busLocation) {
+                                mapRef.current?.fitToCoordinates(result.coordinates, {
+                                    edgePadding: { right: 50, bottom: 50, left: 50, top: 100 },
+                                });
+                            }
+                        }}
+                    />
+                )}
+
+                {/* Legacy/Manual Polyline */}
+                {displayRoute && !origin && validRouteCoords.length > 0 && (
                     <Polyline
                         coordinates={validRouteCoords}
                         strokeColor="#4c51bf"
                         strokeWidth={4}
                     />
                 )}
+
+                {/* Stops Markers */}
+                {displayRoute && Array.isArray(routeStops) && routeStops.map((stop, index) => (
+                    <Marker
+                        key={`stop-${index}`}
+                        coordinate={{ latitude: stop.lat, longitude: stop.lng }}
+                        title={stop.name}
+                        pinColor={index === 0 ? "green" : (index === routeStops.length - 1 ? "red" : "blue")}
+                    />
+                ))}
 
                 {/* Bus Marker */}
                 <Marker.Animated
@@ -141,12 +178,20 @@ const MapComponent = ({
 
             {/* UI Overlays */}
 
-            {/* Speedometer */}
-            <View style={styles.speedometerContainer}>
+            <View style={styles.topRightControls}>
+                {/* Speedometer */}
                 <View style={styles.speedCircle}>
-                    <Text style={styles.speedValue}>{speed}</Text>
+                    <Text style={styles.speedValue}>{Math.round(speed)}</Text>
                     <Text style={styles.speedUnit}>km/h</Text>
                 </View>
+
+                {/* Route Toggle */}
+                <TouchableOpacity
+                    style={[styles.controlBtn, displayRoute && styles.activeControlBtn]}
+                    onPress={() => setDisplayRoute(!displayRoute)}
+                >
+                    <Ionicons name="trail-sign" size={24} color={displayRoute ? "white" : "#2d3748"} />
+                </TouchableOpacity>
             </View>
 
             {/* Connection Status */}
@@ -206,22 +251,26 @@ const styles = StyleSheet.create({
         height: 36,
         resizeMode: "contain"
     },
-    speedometerContainer: {
+    topRightControls: {
         position: 'absolute',
         top: 60,
         right: 20,
-        alignItems: 'center'
+        alignItems: 'center',
+        gap: 15
     },
     speedCircle: {
-        width: 70,
-        height: 70,
-        borderRadius: 35,
-        backgroundColor: 'rgba(255,255,255,0.9)',
+        width: 60,
+        height: 60,
+        borderRadius: 30,
+        backgroundColor: 'rgba(255,255,255,0.95)',
         justifyContent: 'center',
         alignItems: 'center',
         elevation: 5,
-        borderWidth: 3,
-        borderColor: '#48bb78'
+        borderWidth: 2,
+        borderColor: '#48bb78',
+        shadowColor: "#000",
+        shadowOpacity: 0.1,
+        shadowRadius: 5
     },
     speedValue: {
         fontSize: 24,

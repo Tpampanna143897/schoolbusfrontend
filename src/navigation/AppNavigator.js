@@ -16,6 +16,12 @@ import DriverMapScreen from "../screens/driver/DriverMapScreen";
 import AdminLiveTripsScreen from "../screens/admin/AdminLiveTripsScreen";
 import AdminMapScreen from "../screens/admin/AdminMapScreen";
 import AdminAllBusesMapScreen from "../screens/admin/AdminAllBusesMapScreen";
+import AdminStaffManagementScreen from "../screens/admin/AdminStaffManagementScreen";
+import AdminTripHistoryScreen from "../screens/admin/AdminTripHistoryScreen";
+import StaffDashboardScreen from "../screens/driver/StaffDashboardScreen";
+import StaffLiveTrackingScreen from "../screens/driver/StaffLiveTrackingScreen";
+import StaffCalendarViewScreen from "../screens/driver/StaffCalendarViewScreen";
+import ParentCalendarScreen from "../screens/parent/ParentCalendarScreen";
 
 const Stack = createNativeStackNavigator();
 
@@ -52,6 +58,16 @@ const AppNavigator = () => {
                         <Stack.Screen name="AdminLiveTrips" component={AdminLiveTripsScreen} options={{ headerShown: true, title: 'Live Fleet' }} />
                         <Stack.Screen name="AdminMap" component={AdminMapScreen} />
                         <Stack.Screen name="AdminAllBusesMap" component={AdminAllBusesMapScreen} />
+                        <Stack.Screen name="AdminStaffManagement" component={AdminStaffManagementScreen} options={{ headerShown: true, title: 'Manage Staff' }} />
+                        <Stack.Screen name="AdminTripHistory" component={AdminTripHistoryScreen} options={{ headerShown: true, title: 'Trip History' }} />
+
+                        {/* Staff Specific Screens */}
+                        <Stack.Screen name="StaffDashboard" component={StaffDashboardScreen} />
+                        <Stack.Screen name="StaffLiveTracking" component={StaffLiveTrackingScreen} />
+                        <Stack.Screen name="StaffCalendarView" component={StaffCalendarViewScreen} options={{ headerShown: true, title: 'Attendance Feed' }} />
+
+                        {/* Parent Specific Screens (Extended) */}
+                        <Stack.Screen name="ParentCalendar" component={ParentCalendarScreen} options={{ headerShown: true, title: 'Attendance History' }} />
                     </>
                 ) : (
                     <Stack.Screen name="Login" component={LoginScreen} />

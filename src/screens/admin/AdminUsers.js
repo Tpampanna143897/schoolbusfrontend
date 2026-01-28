@@ -9,6 +9,7 @@ import Dropdown from '../../components/Dropdown';
 const AdminUsers = () => {
     const [drivers, setDrivers] = useState([]);
     const [parents, setParents] = useState([]);
+    const [staff, setStaff] = useState([]);
     const [loading, setLoading] = useState(true);
     const [modalVisible, setModalVisible] = useState(false);
 
@@ -25,12 +26,14 @@ const AdminUsers = () => {
     const fetchUsers = async () => {
         setLoading(true);
         try {
-            const [driversRes, parentsRes] = await Promise.all([
+            const [driversRes, parentsRes, staffRes] = await Promise.all([
                 adminApi.getUsers('DRIVER'),
-                adminApi.getUsers('PARENT')
+                adminApi.getUsers('PARENT'),
+                adminApi.getUsers('STAFF')
             ]);
             setDrivers(driversRes.data);
             setParents(parentsRes.data);
+            setStaff(staffRes.data);
         } catch (error) {
             Alert.alert('Error', 'Failed to fetch users');
         } finally {
@@ -70,8 +73,14 @@ const AdminUsers = () => {
                 <Text style={styles.userName}>{item.name}</Text>
                 <Text style={styles.userEmail}>{item.email}</Text>
             </View>
-            <View style={[styles.roleBadge, { backgroundColor: item.role === 'DRIVER' ? '#ebf8ff' : '#faf5ff' }]}>
-                <Text style={[styles.roleText, { color: item.role === 'DRIVER' ? '#3182ce' : '#805ad5' }]}>
+            <View style={[
+                styles.roleBadge,
+                { backgroundColor: item.role === 'DRIVER' ? '#ebf8ff' : (item.role === 'STAFF' ? '#f0fff4' : '#faf5ff') }
+            ]}>
+                <Text style={[
+                    styles.roleText,
+                    { color: item.role === 'DRIVER' ? '#3182ce' : (item.role === 'STAFF' ? '#38a169' : '#805ad5') }
+                ]}>
                     {item.role}
                 </Text>
             </View>
@@ -97,6 +106,11 @@ const AdminUsers = () => {
                 {parents.map(user => (
                     <View key={user._id}>{renderUser({ item: user })}</View>
                 ))}
+
+                <Text style={styles.sectionTitle}>Staff ({staff.length})</Text>
+                {staff.map(user => (
+                    <View key={user._id}>{renderUser({ item: user })}</View>
+                ))}
             </ScrollView>
 
             <Modal visible={modalVisible} animationType="slide" transparent={true}>
@@ -119,7 +133,8 @@ const AdminUsers = () => {
                                 onValueChange={setRole}
                                 items={[
                                     { id: 'DRIVER', label: 'Driver' },
-                                    { id: 'PARENT', label: 'Parent' }
+                                    { id: 'PARENT', label: 'Parent' },
+                                    { id: 'STAFF', label: 'Staff' }
                                 ]}
                             />
 

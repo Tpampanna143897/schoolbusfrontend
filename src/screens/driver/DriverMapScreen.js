@@ -108,41 +108,41 @@ const DriverMapScreen = ({ route, navigation }) => {
     const sendLocationUpdate = async (coords, speedKmh, course, retryCount = 0) => {
         if (!tripId || !coords.latitude || !coords.longitude || isPaused) return;
 
-        // 4) Throttle updates to once every 5 seconds
+        // Defensive checks for bus and user
+        const busId = bus?._id || bus?.id;
+        const driverId = user?._id || user?.id;
+
+        if (!busId || !driverId) {
+            console.warn("[TRACKING] Missing Bus ID or Driver ID. Update skipped.", { busId, driverId });
+            return;
+        }
+
         const now = Date.now();
         if (now - lastEmitRef.current < 5000 && retryCount === 0) {
             return;
         }
         lastEmitRef.current = now;
 
-        try {
-            // 1. WebSocket Emit (for real-time dashboard updates)
-            // 4) Never emit undefined latitude/longitude (Backend check also added)
-            // 3) Only the active driver can emit GPS updates (Backend check also added)
-            emitLocation({
-                tripId,
-                busId: bus._id,
-                driverId: user?._id || user?.id,
-                lat: coords.latitude,
-                lng: coords.longitude,
-                speed: speedKmh,
-                heading: course || 0
-            });
+        const payload = {
+            tripId,
+            busId,
+            driverId,
+            lat: coords.latitude,
+            lng: coords.longitude,
+            speed: speedKmh,
+            heading: course || 0
+        };
 
-            // 2. REST API Sync (Requirement D: POST /api/tracking/update)
-            await client.post('/tracking/update', {
-                tripId,
-                busId: bus._id,
-                driverId: user?._id || user?.id,
-                lat: coords.latitude,
-                lng: coords.longitude,
-                speed: speedKmh,
-                heading: course || 0
-            });
+        try {
+            // 1. WebSocket Emit
+            emitLocation(payload);
+
+            // 2. REST API Sync
+            await client.post('/tracking/update', payload);
 
         } catch (err) {
             console.log(`Failed to sync location (Attempt ${retryCount + 1}):`, err.message);
-            if (retryCount < 2) { // Retry logic: 3 attempts total
+            if (retryCount < 2) {
                 setTimeout(() => {
                     sendLocationUpdate(coords, speedKmh, course, retryCount + 1);
                 }, 2000);
