@@ -14,38 +14,20 @@ import axios from 'axios';
 const LOCATION_TASK_NAME = 'background-location-task';
 
 // Define the background task
+// CRITICAL: We remove all network (Axios) calls from the background task.
+// Background tasks in managed workflow often exit if they perform async network IO.
+// We will rely on foreground Socket.IO for real-time tracking.
 TaskManager.defineTask(LOCATION_TASK_NAME, async ({ data, error }) => {
   if (error) {
-    console.error("[TASK_MANAGER] Error in background location task:", error);
+    console.warn("[TASK_MANAGER] Background location error:", error);
     return;
   }
   if (data) {
     const { locations } = data;
-    const location = locations[0];
-    if (!location) return;
-
-    try {
-      // 1. Fetch stored session info
-      const sessionStr = await SecureStore.getItemAsync('active_trip_session');
-      if (!sessionStr) return;
-
-      const { tripId, busId, driverId, baseUrl } = JSON.parse(sessionStr);
-      if (!tripId || !baseUrl) return;
-
-      // 2. Sync to REST API (Sockets often disconnect in strict background)
-      // Use raw axios to avoid interceptor issues in headless task
-      await axios.post(`${baseUrl}/tracking/update`, {
-        tripId, busId, driverId,
-        lat: location.coords.latitude,
-        lng: location.coords.longitude,
-        speed: Math.max(0, Math.round((location.coords.speed || 0) * 3.6)),
-        heading: location.coords.heading || 0
-      }, { timeout: 10000 });
-
-      console.log('[TASK_MANAGER] BG-Sync Success for Trip:', tripId);
-    } catch (e) {
-      console.log('[TASK_MANAGER] BG-Sync silent fail (Network or Session):', e.message);
-    }
+    // We intentionally do nothing here to keep the task alive for the OS
+    // without triggering a crash from Headless JS network calls.
+    // The OS will still keep the app "warm" for foreground socket resumption.
+    console.log("[TASK_MANAGER] Received BG location update (Headless)");
   }
 });
 

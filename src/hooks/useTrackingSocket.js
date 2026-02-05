@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState, useCallback, useMemo } from 'react';
+import { AppState } from 'react-native';
 import io from 'socket.io-client';
 import client from '../api/client';
 
@@ -7,9 +8,15 @@ export const useTrackingSocket = (role) => {
     const [connectionStatus, setConnectionStatus] = useState("Connecting...");
     const [isConnected, setIsConnected] = useState(false);
     const locationQueue = useRef([]); // 5) Offline GPS queueing
-
+    const appState = useRef(AppState.currentState);
 
     useEffect(() => {
+        // AppState listener: We ONLY emit tracking if explicitly foregrounded
+        const subscription = AppState.addEventListener('change', nextAppState => {
+            appState.current = nextAppState;
+            console.log(`[SOCKET] AppState changed to: ${nextAppState}`);
+        });
+
         let baseUrl = client.defaults.baseURL || "";
         let socketUrl = baseUrl ? baseUrl.split('/api')[0] : "";
 
@@ -20,9 +27,9 @@ export const useTrackingSocket = (role) => {
 
         // 1) Implement a production-safe Socket.IO client in Expo
         socketRef.current = io(socketUrl, {
-            transports: ["websocket", "polling"],
+            transports: ["polling", "websocket"],
             reconnection: true,
-            reconnectionAttempts: 10,
+            reconnectionAttempts: 15,
             reconnectionDelay: 2000,
             reconnectionDelayMax: 10000,
             timeout: 20000,
@@ -60,6 +67,7 @@ export const useTrackingSocket = (role) => {
         });
 
         return () => {
+            subscription.remove();
             if (socketRef.current) {
                 console.log(`[SOCKET] Cleaning up ${role} socket...`);
                 socketRef.current.removeAllListeners();
@@ -93,9 +101,17 @@ export const useTrackingSocket = (role) => {
     }, []);
 
     const emitLocation = useCallback((data) => {
-        // 4) Add GPS emit safeguards: Never emit undefined latitude/longitude
-        if (!data.lat || !data.lng || !data.tripId || !data.busId || !data.driverId) {
-            console.warn("[SOCKET] Attempted to emit invalid location data", data);
+        // PRODUCTION SAFEGUARDS:
+        // 1. Only emit if app is ACTIVE (Foreground)
+        if (appState.current !== 'active') {
+            return false;
+        }
+
+        const { lat, lng, tripId, busId, driverId } = data;
+
+        // 2. Strict Coordinate Validation (Prevents Native App Crash)
+        if (!tripId || !busId || !driverId || !Number.isFinite(lat) || !Number.isFinite(lng)) {
+            console.warn("[SOCKET] Rejected invalid/NaN GPS point:", data);
             return false;
         }
 
@@ -103,9 +119,10 @@ export const useTrackingSocket = (role) => {
             socketRef.current.emit("driver-location-update", data);
             return true;
         } else {
-            // 5) Store updates locally if socket is disconnected
-            console.log("[SOCKET] Disconnected. Queueing location update...");
+            // Keep queueing for reconnections
+            console.log("[SOCKET] Offline. Queueing update...");
             locationQueue.current.push({ ...data, queued: true, timestamp: new Date() });
+            if (locationQueue.current.length > 30) locationQueue.current.shift();
             return false;
         }
     }, []);

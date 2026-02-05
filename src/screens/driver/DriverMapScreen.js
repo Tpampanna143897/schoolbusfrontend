@@ -127,9 +127,7 @@ const DriverMapScreen = ({ route, navigation }) => {
         }
     };
 
-    const lastRestSyncRef = useRef(0);
-
-    const sendLocationUpdate = async (coords, speedKmh, course, retryCount = 0) => {
+    const sendLocationUpdate = async (coords, speedKmh, course) => {
         if (!tripId || !coords.latitude || !coords.longitude || isPaused) return;
 
         const busId = bus?._id || bus?.id;
@@ -138,8 +136,8 @@ const DriverMapScreen = ({ route, navigation }) => {
         if (!busId || !driverId) return;
 
         const now = Date.now();
-        // Throttle Socket emits to 5 seconds
-        if (now - lastEmitRef.current < 5000 && retryCount === 0) return;
+        // Throttle Socket emits to 5 seconds to save battery/bandwidth
+        if (now - lastEmitRef.current < 5000) return;
         lastEmitRef.current = now;
 
         const payload = {
@@ -150,22 +148,8 @@ const DriverMapScreen = ({ route, navigation }) => {
             heading: course || 0
         };
 
-        try {
-            // 1. WebSocket Emit (High frequency)
-            emitLocation(payload);
-
-            // 2. REST API Sync (Low frequency - every 30s)
-            if (now - lastRestSyncRef.current > 30000 || retryCount > 0) {
-                lastRestSyncRef.current = now;
-                await client.post('/tracking/update', payload);
-            }
-
-        } catch (err) {
-            console.warn(`[GPS] Sync error (retry ${retryCount}):`, err.message);
-            if (retryCount < 2) {
-                setTimeout(() => sendLocationUpdate(coords, speedKmh, course, retryCount + 1), 5000);
-            }
-        }
+        // WebSocket Emit ONLY (Cleaner, more stable for Android release APK)
+        emitLocation(payload);
     };
 
     const handlePause = async () => {
