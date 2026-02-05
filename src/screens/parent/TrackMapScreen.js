@@ -9,94 +9,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 // Derive Socket URL from Client Base URL for flexibility
 // Removes '/api' from the end of the baseURL to get the root server URL
 
-const mapStyle = [
-    {
-        "elementType": "geometry",
-        "stylers": [{ "color": "#f5f5f5" }]
-    },
-    {
-        "elementType": "labels.icon",
-        "stylers": [{ "visibility": "off" }]
-    },
-    {
-        "elementType": "labels.text.fill",
-        "stylers": [{ "color": "#616161" }]
-    },
-    {
-        "elementType": "labels.text.stroke",
-        "stylers": [{ "color": "#f5f5f5" }]
-    },
-    {
-        "featureType": "administrative.land_parcel",
-        "elementType": "labels.text.fill",
-        "stylers": [{ "color": "#bdbdbd" }]
-    },
-    {
-        "featureType": "poi",
-        "elementType": "geometry",
-        "stylers": [{ "color": "#eeeeee" }]
-    },
-    {
-        "featureType": "poi",
-        "elementType": "labels.text.fill",
-        "stylers": [{ "color": "#757575" }]
-    },
-    {
-        "featureType": "poi.park",
-        "elementType": "geometry",
-        "stylers": [{ "color": "#e5e5e5" }]
-    },
-    {
-        "featureType": "poi.park",
-        "elementType": "labels.text.fill",
-        "stylers": [{ "color": "#9e9e9e" }]
-    },
-    {
-        "featureType": "road",
-        "elementType": "geometry",
-        "stylers": [{ "color": "#ffffff" }]
-    },
-    {
-        "featureType": "road.arterial",
-        "elementType": "labels.text.fill",
-        "stylers": [{ "color": "#757575" }]
-    },
-    {
-        "featureType": "road.highway",
-        "elementType": "geometry",
-        "stylers": [{ "color": "#dadada" }]
-    },
-    {
-        "featureType": "road.highway",
-        "elementType": "labels.text.fill",
-        "stylers": [{ "color": "#616161" }]
-    },
-    {
-        "featureType": "road.local",
-        "elementType": "labels.text.fill",
-        "stylers": [{ "color": "#9e9e9e" }]
-    },
-    {
-        "featureType": "transit.line",
-        "elementType": "geometry",
-        "stylers": [{ "color": "#e5e5e5" }]
-    },
-    {
-        "featureType": "transit.station",
-        "elementType": "geometry",
-        "stylers": [{ "color": "#eeeeee" }]
-    },
-    {
-        "featureType": "water",
-        "elementType": "geometry",
-        "stylers": [{ "color": "#c9c9c9" }]
-    },
-    {
-        "featureType": "water",
-        "elementType": "labels.text.fill",
-        "stylers": [{ "color": "#9e9e9e" }]
-    }
-];
+// Custom Map Style moved to MapComponent.js
 
 import { useTrackingSocket } from "../../hooks/useTrackingSocket";
 import MapComponent from "../../components/MapComponent";
@@ -108,6 +21,7 @@ const TrackMapScreen = ({ route, navigation }) => {
     const [speed, setSpeed] = useState(0);
     const [lastUpdated, setLastUpdated] = useState("");
     const [loading, setLoading] = useState(true);
+    const [mode, setMode] = useState('MORNING');
 
     if (!busId && !route.params?.busId) {
         // We will try to fetchMyBus if no ID is passed
@@ -166,6 +80,7 @@ const TrackMapScreen = ({ route, navigation }) => {
                 setBusLocation({ latitude: res.data.lat, longitude: res.data.lng });
                 setSpeed(res.data.speed || 0);
                 setLastUpdated(new Date(res.data.timestamp || Date.now()).toLocaleTimeString());
+                if (res.data.type) setMode(res.data.type);
             }
         } catch (err) {
             console.log("Error fetching initial location", err.message);
@@ -192,6 +107,8 @@ const TrackMapScreen = ({ route, navigation }) => {
                 speed={speed}
                 connectionStatus={connectionStatus}
                 lastUpdated={lastUpdated}
+                mode={mode}
+                routeStops={busDetails?.route?.stops || []}
             />
 
             {/* Floating Back Button */}

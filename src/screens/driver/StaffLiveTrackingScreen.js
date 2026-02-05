@@ -77,6 +77,7 @@ const StaffLiveTrackingScreen = ({ route }) => {
                 busDetails={activeTrip?.busId}
                 speed={activeTrip?.location?.speed || 0}
                 routeStops={activeTrip?.routeId?.stops || []}
+                mode={activeTrip?.type || 'MORNING'}
                 connectionStatus={trips.length > 0 ? `Monitoring ${trips.length} Live Buses` : "Scanning for active trips..."}
             />
             {!activeTrip && trips.length > 0 && (

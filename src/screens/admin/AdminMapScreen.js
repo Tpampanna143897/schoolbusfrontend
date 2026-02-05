@@ -83,6 +83,8 @@ const AdminMapScreen = ({ route, navigation }) => {
                 isDriver={false}
                 connectionStatus={connectionStatus}
                 lastUpdated={lastUpdated}
+                mode={trip.type || 'MORNING'}
+                routeStops={trip.routeId?.stops || []}
             />
 
             <SafeAreaView style={styles.backBtnContainer} edges={['top']}>

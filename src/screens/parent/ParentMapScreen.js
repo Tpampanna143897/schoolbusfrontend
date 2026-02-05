@@ -102,6 +102,7 @@ const ParentMapScreen = ({ route, navigation }) => {
                 connectionStatus={connectionStatus}
                 lastUpdated={lastUpdated}
                 mode={mode}
+                routeStops={busDetails?.route?.stops || []}
             />
 
             <SafeAreaView style={styles.backBtnContainer}>

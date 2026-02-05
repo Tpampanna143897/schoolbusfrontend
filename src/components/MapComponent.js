@@ -11,6 +11,22 @@ import MapViewDirections from 'react-native-maps-directions';
 
 const GOOGLE_MAPS_APIKEY = "AIzaSyAu6yiOEH5Bo0ovfMKFvJ-_RS_Kgl-Qgn8"; // From app.json
 
+const SWIGGY_MAP_STYLE = [
+    { "elementType": "geometry", "stylers": [{ "color": "#f5f5f5" }] },
+    { "elementType": "labels.icon", "stylers": [{ "visibility": "off" }] },
+    { "elementType": "labels.text.fill", "stylers": [{ "color": "#616161" }] },
+    { "elementType": "labels.text.stroke", "stylers": [{ "color": "#f5f5f5" }] },
+    { "featureType": "administrative.land_parcel", "elementType": "labels.text.fill", "stylers": [{ "color": "#bdbdbd" }] },
+    { "featureType": "poi", "elementType": "geometry", "stylers": [{ "color": "#eeeeee" }] },
+    { "featureType": "poi", "elementType": "labels.text.fill", "stylers": [{ "color": "#757575" }] },
+    { "featureType": "poi.park", "elementType": "geometry", "stylers": [{ "color": "#e5e5e5" }] },
+    { "featureType": "road", "elementType": "geometry", "stylers": [{ "color": "#ffffff" }] },
+    { "featureType": "road.arterial", "elementType": "labels.text.fill", "stylers": [{ "color": "#757575" }] },
+    { "featureType": "road.highway", "elementType": "geometry", "stylers": [{ "color": "#dadada" }] },
+    { "featureType": "water", "elementType": "geometry", "stylers": [{ "color": "#c9c9c9" }] },
+    { "featureType": "water", "elementType": "labels.text.fill", "stylers": [{ "color": "#9e9e9e" }] }
+];
+
 const AnimatedBusMarker = memo(({ bus, onPress }) => {
     const isValidLoc = bus.location &&
         typeof bus.location.latitude === 'number' &&
@@ -94,10 +110,26 @@ const MapComponent = ({
         return (routeStops || []).filter(s => s && typeof s.lat === 'number' && !isNaN(s.lat) && typeof s.lng === 'number' && !isNaN(s.lng));
     }, [routeStops]);
 
-    // Format stops for Directions
-    const origin = (validStops.length > 1) ? { latitude: validStops[0].lat, longitude: validStops[0].lng } : null;
-    const destination = (validStops.length > 1) ? { latitude: validStops[validStops.length - 1].lat, longitude: validStops[validStops.length - 1].lng } : null;
-    const waypoints = (validStops.length > 2) ? validStops.slice(1, -1).map(s => ({ latitude: s.lat, longitude: s.lng })) : [];
+    // DIRECTIONAL LOGIC
+    const { origin, destination, waypoints } = useMemo(() => {
+        if (!validStops.length) return { origin: null, destination: null, waypoints: [] };
+
+        if (mode === 'MORNING') {
+            // MORNING: Route Stops -> School
+            return {
+                origin: { latitude: validStops[0].lat, longitude: validStops[0].lng },
+                destination: SCHOOL_LOCATION,
+                waypoints: validStops.slice(1).map(s => ({ latitude: s.lat, longitude: s.lng }))
+            };
+        } else {
+            // EVENING: School -> Route Stops
+            return {
+                origin: SCHOOL_LOCATION,
+                destination: { latitude: validStops[validStops.length - 1].lat, longitude: validStops[validStops.length - 1].lng },
+                waypoints: validStops.slice(0, -1).map(s => ({ latitude: s.lat, longitude: s.lng }))
+            };
+        }
+    }, [validStops, mode]);
 
     // Smooth Animated Coordinate state for SINGLE bus mode
     const [animatedCoordinate] = useState(new AnimatedRegion({
@@ -187,6 +219,7 @@ const MapComponent = ({
                 showsCompass={true}
                 rotateEnabled={true}
                 toolbarEnabled={false}
+                customMapStyle={SWIGGY_MAP_STYLE}
             >
                 {/* Directions API Polyline */}
                 {displayRoute && origin && destination && (
@@ -223,8 +256,12 @@ const MapComponent = ({
                         key={`stop-${index}`}
                         coordinate={{ latitude: stop.lat, longitude: stop.lng }}
                         title={stop.name}
-                        pinColor={index === 0 ? "green" : (index === validStops.length - 1 ? "red" : "blue")}
-                    />
+                        anchor={{ x: 0.5, y: 0.5 }}
+                    >
+                        <View style={styles.stopDot}>
+                            <View style={styles.stopDotInner} />
+                        </View>
+                    </Marker>
                 ))}
 
                 {/* School Marker */}
@@ -429,12 +466,31 @@ const styles = StyleSheet.create({
         fontWeight: 'bold'
     },
     schoolMarker: {
-        backgroundColor: '#4c51bf',
+        backgroundColor: '#FC8019', // Swiggy Orange
         padding: 8,
         borderRadius: 20,
-        borderWidth: 2,
+        borderWidth: 3,
         borderColor: 'white',
-        elevation: 5
+        elevation: 10,
+        shadowColor: "#000",
+        shadowOpacity: 0.3,
+        shadowRadius: 5
+    },
+    stopDot: {
+        width: 16,
+        height: 16,
+        borderRadius: 8,
+        backgroundColor: 'rgba(76, 81, 191, 0.3)',
+        justifyContent: 'center',
+        alignItems: 'center',
+    },
+    stopDotInner: {
+        width: 8,
+        height: 8,
+        borderRadius: 4,
+        backgroundColor: '#4c51bf',
+        borderWidth: 1,
+        borderColor: 'white'
     }
 });
 
