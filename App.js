@@ -7,29 +7,24 @@ import { StatusBar } from "expo-status-bar";
 import * as SplashScreen from "expo-splash-screen";
 import * as TaskManager from 'expo-task-manager';
 import * as Location from 'expo-location';
+import { Platform } from 'react-native';
 
-import * as SecureStore from 'expo-secure-store';
-import axios from 'axios';
-
+const isWeb = Platform.OS === 'web';
 const LOCATION_TASK_NAME = 'background-location-task';
 
-// Define the background task
-// CRITICAL: We remove all network (Axios) calls from the background task.
-// Background tasks in managed workflow often exit if they perform async network IO.
-// We will rely on foreground Socket.IO for real-time tracking.
-TaskManager.defineTask(LOCATION_TASK_NAME, async ({ data, error }) => {
-  if (error) {
-    console.warn("[TASK_MANAGER] Background location error:", error);
-    return;
-  }
-  if (data) {
-    const { locations } = data;
-    // We intentionally do nothing here to keep the task alive for the OS
-    // without triggering a crash from Headless JS network calls.
-    // The OS will still keep the app "warm" for foreground socket resumption.
-    console.log("[TASK_MANAGER] Received BG location update (Headless)");
-  }
-});
+// Define the background task (NATIVE ONLY)
+if (!isWeb) {
+  TaskManager.defineTask(LOCATION_TASK_NAME, async ({ data, error }) => {
+    if (error) {
+      console.warn("[TASK_MANAGER] Background location error:", error);
+      return;
+    }
+    if (data) {
+      const { locations } = data;
+      console.log("[TASK_MANAGER] Received BG location update (Headless)");
+    }
+  });
+}
 
 // Keep the splash screen visible while we fetch resources
 SplashScreen.preventAutoHideAsync().catch(() => {

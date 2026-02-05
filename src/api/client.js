@@ -1,5 +1,5 @@
 import axios from "axios";
-import * as SecureStore from "expo-secure-store";
+import { storage } from "../utils/storage";
 
 // --- CONFIGURATION ---
 // 1. For Physical Device + Hotspot: Use 192.168.137.1
@@ -24,7 +24,7 @@ const client = axios.create({
 });
 
 client.interceptors.request.use(async (config) => {
-    const token = await SecureStore.getItemAsync("token");
+    const token = await storage.getItemAsync("token");
     if (token) {
         config.headers.Authorization = `Bearer ${token}`;
     }
@@ -37,7 +37,7 @@ client.interceptors.response.use(
     async (error) => {
         if (error.response?.status === 401) {
             console.warn("[API] Session expired. Clearing local token...");
-            await SecureStore.deleteItemAsync("token");
+            await storage.deleteItemAsync("token");
         } else if (!error.response) {
             if (error.code === 'ECONNABORTED') {
                 console.error("[API] Network Timeout: Server is taking too long to respond (likely cold start).");

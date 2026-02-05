@@ -1,5 +1,5 @@
 import React, { createContext, useState, useEffect } from "react";
-import * as SecureStore from "expo-secure-store";
+import { storage } from "../utils/storage";
 import client from "../api/client";
 
 export const AuthContext = createContext();
@@ -14,8 +14,8 @@ export const AuthProvider = ({ children }) => {
     useEffect(() => {
         const loadAuth = async () => {
             try {
-                const storedToken = await SecureStore.getItemAsync("token");
-                const storedRole = await SecureStore.getItemAsync("role");
+                const storedToken = await storage.getItemAsync("token");
+                const storedRole = await storage.getItemAsync("role");
 
                 if (storedToken && storedRole) {
                     setToken(storedToken);
@@ -44,8 +44,8 @@ export const AuthProvider = ({ children }) => {
 
             const { token, role, user } = res.data;
 
-            await SecureStore.setItemAsync("token", token);
-            await SecureStore.setItemAsync("role", role);
+            await storage.setItemAsync("token", token);
+            await storage.setItemAsync("role", role);
 
             setToken(token);
             setRole(role);
@@ -71,8 +71,8 @@ export const AuthProvider = ({ children }) => {
     };
 
     const logout = async () => {
-        await SecureStore.deleteItemAsync("token");
-        await SecureStore.deleteItemAsync("role");
+        await storage.deleteItemAsync("token");
+        await storage.deleteItemAsync("role");
         setToken(null);
         setRole(null);
         setUser(null);

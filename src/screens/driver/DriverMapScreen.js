@@ -8,7 +8,7 @@ import { Ionicons } from "@expo/vector-icons";
 import MapComponent from "../../components/MapComponent";
 import { useTrackingSocket } from "../../hooks/useTrackingSocket";
 
-import * as SecureStore from 'expo-secure-store';
+// SecureStore removed (handled by cross-platform utility if needed)
 
 const DriverMapScreen = ({ route, navigation }) => {
     const { bus, tripId, mode } = route.params;
