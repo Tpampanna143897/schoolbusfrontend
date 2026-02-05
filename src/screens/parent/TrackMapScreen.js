@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useRef } from "react";
 import { View, StyleSheet, Text, ActivityIndicator, Dimensions, TouchableOpacity, Image } from "react-native";
-import MapView, { Marker, PROVIDER_GOOGLE } from "react-native-maps";
+// Map imports handled by MapComponent
 import io from "socket.io-client";
 import { Ionicons } from "@expo/vector-icons";
 import client from "../../api/client";
