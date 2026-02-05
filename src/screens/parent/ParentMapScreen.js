@@ -77,7 +77,11 @@ const ParentMapScreen = ({ route, navigation }) => {
                 setBusLocation(null);
             }
         } catch (err) {
-            console.log("Error fetching location:", err.message);
+            if (err.response && err.response.status === 404) {
+                console.log("No location data found yet - bus might be starting or offline");
+            } else {
+                console.log("Error fetching location:", err.message);
+            }
         } finally {
             setLoading(false);
         }

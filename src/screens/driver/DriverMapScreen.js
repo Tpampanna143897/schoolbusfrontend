@@ -148,6 +148,7 @@ const DriverMapScreen = ({ route, navigation }) => {
             heading: course || 0
         };
 
+        // console.log(`[DRIVER] Emitting location for Bus:${busId}, Driver:${driverId}`);
         // WebSocket Emit ONLY (Cleaner, more stable for Android release APK)
         emitLocation(payload);
     };
