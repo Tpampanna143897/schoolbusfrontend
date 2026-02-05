@@ -61,7 +61,7 @@ const ParentMapScreen = ({ route, navigation }) => {
             if (tripId) {
                 res = await client.get(`/parent/trip-location/${tripId}`);
             } else if (bus?._id) {
-                res = await client.get(`/tracking/bus-location/${bus._id}`);
+                res = await client.get(`/parent/bus-location/${bus._id}`);
             } else {
                 setLoading(false);
                 return;

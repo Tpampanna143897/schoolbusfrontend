@@ -158,6 +158,21 @@ const TrackMapScreen = ({ route, navigation }) => {
         }
     };
 
+    const fetchInitialLocation = async (id) => {
+        try {
+            const res = await client.get(`/parent/bus-location/${id}`);
+            if (res.data && typeof res.data.lat === 'number') {
+                setBusLocation({ latitude: res.data.lat, longitude: res.data.lng });
+                setSpeed(res.data.speed || 0);
+                setLastUpdated(new Date(res.data.timestamp || Date.now()).toLocaleTimeString());
+            }
+        } catch (err) {
+            console.log("Error fetching initial location", err.message);
+        } finally {
+            setLoading(false);
+        }
+    };
+
     if (loading) {
         return (
             <View style={styles.center}>
