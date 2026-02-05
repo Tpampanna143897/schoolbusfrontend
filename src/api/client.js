@@ -42,6 +42,11 @@ client.interceptors.response.use(
             if (error.code === 'ECONNABORTED') {
                 console.error("[API] Network Timeout: Server is taking too long to respond (likely cold start).");
             } else {
+                console.error("[API] Network Error Details:", {
+                    message: error.message,
+                    code: error.code,
+                    config: error.config?.url
+                });
                 console.error("[API] Network Error: Unable to reach server. Check internet or BASE_URL.");
             }
         } else {
