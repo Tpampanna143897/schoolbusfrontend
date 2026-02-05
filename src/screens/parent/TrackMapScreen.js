@@ -113,7 +113,7 @@ const TrackMapScreen = ({ route, navigation }) => {
         // We will try to fetchMyBus if no ID is passed
     }
 
-    const { connectionStatus, onLocationUpdate, joinBus } = useTrackingSocket("PARENT");
+    const { connectionStatus, onLocationUpdate, joinBus, isConnected } = useTrackingSocket("PARENT");
 
     useEffect(() => {
         if (!busId) {
@@ -129,7 +129,7 @@ const TrackMapScreen = ({ route, navigation }) => {
         if (busId) {
             joinBus(busId);
         }
-    }, [busId, connectionStatus]);
+    }, [busId, connectionStatus, joinBus]);
 
     // HANDLE INCOMING UPDATES
     useEffect(() => {
@@ -142,7 +142,7 @@ const TrackMapScreen = ({ route, navigation }) => {
             }
         });
         return cleanup;
-    }, [busId, onLocationUpdate]);
+    }, [busId, onLocationUpdate, isConnected]);
 
     const fetchMyBus = async () => {
         try {

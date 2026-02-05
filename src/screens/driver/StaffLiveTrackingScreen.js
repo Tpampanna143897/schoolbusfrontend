@@ -9,12 +9,12 @@ const StaffLiveTrackingScreen = ({ route }) => {
     const [trips, setTrips] = useState([]);
     const [loading, setLoading] = useState(true);
 
-    const { onLocationUpdate, joinAdmin } = useTrackingSocket("STAFF_FLEET");
+    const { onLocationUpdate, joinAdmin, isConnected } = useTrackingSocket("STAFF_FLEET");
 
     useEffect(() => {
         fetchTrips();
         joinAdmin();
-    }, []);
+    }, [joinAdmin]);
 
     useEffect(() => {
         const cleanup = onLocationUpdate((data) => {
@@ -34,7 +34,7 @@ const StaffLiveTrackingScreen = ({ route }) => {
             }));
         });
         return cleanup;
-    }, [onLocationUpdate]);
+    }, [onLocationUpdate, isConnected]);
 
     const fetchTrips = async () => {
         try {

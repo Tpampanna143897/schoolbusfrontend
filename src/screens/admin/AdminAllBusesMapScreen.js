@@ -15,7 +15,7 @@ const AdminAllBusesMapScreen = ({ navigation }) => {
     const [loading, setLoading] = useState(true);
     const mapRef = useRef(null);
 
-    const { connectionStatus, onLocationUpdate, joinAdmin } = useTrackingSocket("ADMIN_FLEET");
+    const { connectionStatus, onLocationUpdate, joinAdmin, isConnected } = useTrackingSocket("ADMIN_FLEET");
 
     useEffect(() => {
         fetchTrips();
@@ -24,7 +24,7 @@ const AdminAllBusesMapScreen = ({ navigation }) => {
     // JOIN ADMIN GLOBAL ROOM
     useEffect(() => {
         joinAdmin();
-    }, [connectionStatus]);
+    }, [connectionStatus, joinAdmin]);
 
     // HANDLE INCOMING UPDATES
     useEffect(() => {
@@ -45,7 +45,7 @@ const AdminAllBusesMapScreen = ({ navigation }) => {
             }));
         });
         return cleanup;
-    }, [onLocationUpdate]);
+    }, [onLocationUpdate, isConnected]);
 
     const fitMap = (currentTrips) => {
         const coords = currentTrips

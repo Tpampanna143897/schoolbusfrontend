@@ -24,7 +24,7 @@ const AdminMapScreen = ({ route, navigation }) => {
     const [lastUpdated, setLastUpdated] = useState("");
     const [loading, setLoading] = useState(true);
 
-    const { connectionStatus, onLocationUpdate, joinBus } = useTrackingSocket("ADMIN");
+    const { connectionStatus, onLocationUpdate, joinBus, isConnected } = useTrackingSocket("ADMIN");
 
     useEffect(() => {
         fetchInitialLocation();
@@ -35,7 +35,7 @@ const AdminMapScreen = ({ route, navigation }) => {
         if (trip.busId?._id) {
             joinBus(trip.busId._id);
         }
-    }, [trip.busId?._id, connectionStatus]);
+    }, [trip.busId?._id, connectionStatus, joinBus]);
 
     // HANDLE INCOMING UPDATES
     useEffect(() => {
@@ -48,7 +48,7 @@ const AdminMapScreen = ({ route, navigation }) => {
             }
         });
         return cleanup;
-    }, [trip._id, onLocationUpdate]);
+    }, [trip._id, onLocationUpdate, isConnected]);
 
     const fetchInitialLocation = async () => {
         try {
