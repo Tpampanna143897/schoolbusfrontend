@@ -100,6 +100,13 @@ export const useTrackingSocket = (role) => {
         }
     }, []);
 
+    const joinTrip = useCallback((tripId) => {
+        if (socketRef.current && tripId) {
+            socketRef.current.emit("join-trip", tripId);
+            console.log(`[SOCKET] Emitted join-trip for ${tripId}`);
+        }
+    }, []);
+
     const emitLocation = useCallback((data) => {
         // PRODUCTION SAFEGUARDS:
         // 1. Only emit if app is ACTIVE (Foreground)
@@ -144,6 +151,7 @@ export const useTrackingSocket = (role) => {
         isConnected,
         joinBus,
         joinAdmin,
+        joinTrip,
         emitLocation,
         onLocationUpdate
     };

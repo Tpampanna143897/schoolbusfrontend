@@ -30,7 +30,7 @@ const AdminAllBusesMapScreen = ({ navigation }) => {
     useEffect(() => {
         const cleanup = onLocationUpdate((data) => {
             setTrips(prev => prev.map(trip => {
-                if (trip._id === data.tripId) {
+                if (trip._id == data.tripId) {
                     return {
                         ...trip,
                         location: {

@@ -23,7 +23,7 @@ const ParentMapScreen = ({ route, navigation }) => {
     const [busLocation, setBusLocation] = useState(null);
     const [speed, setSpeed] = useState(0);
     const [heading, setHeading] = useState(0);
-    const { connectionStatus, onLocationUpdate, joinBus, isConnected } = useTrackingSocket("PARENT");
+    const { connectionStatus, onLocationUpdate, joinBus, joinTrip, isConnected } = useTrackingSocket("PARENT");
     const [lastUpdated, setLastUpdated] = useState("");
     const [loading, setLoading] = useState(true);
     const [mode, setMode] = useState('MORNING');
@@ -32,7 +32,7 @@ const ParentMapScreen = ({ route, navigation }) => {
         fetchInitialLocation();
 
         const cleanup = onLocationUpdate((data) => {
-            const isMatch = (tripId && data.tripId === tripId) || (bus?._id && data.busId === bus._id);
+            const isMatch = (tripId && data.tripId == tripId) || (bus?._id && data.busId == bus._id);
             if (isMatch && typeof data.lat === 'number' && typeof data.lng === 'number') {
                 const newLoc = { latitude: data.lat, longitude: data.lng };
                 setBusLocation(newLoc);
@@ -48,12 +48,11 @@ const ParentMapScreen = ({ route, navigation }) => {
         };
     }, [tripId, bus?._id, onLocationUpdate, isConnected]);
 
-    // JOIN BUS ROOM FOR REAL-TIME UPDATES
+    // JOIN BUS & TRIP ROOMS FOR REAL-TIME UPDATES
     useEffect(() => {
-        if (bus?._id || tripId) {
-            joinBus(bus?._id || tripId);
-        }
-    }, [bus?._id, tripId, connectionStatus, joinBus]);
+        if (bus?._id) joinBus(bus._id);
+        if (tripId) joinTrip(tripId);
+    }, [bus?._id, tripId, connectionStatus, joinBus, joinTrip]);
 
     const fetchInitialLocation = async () => {
         try {

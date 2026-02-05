@@ -40,7 +40,7 @@ const AdminMapScreen = ({ route, navigation }) => {
     // HANDLE INCOMING UPDATES
     useEffect(() => {
         const cleanup = onLocationUpdate((data) => {
-            if (data && data.tripId === trip._id && typeof data.lat === 'number') {
+            if (data && data.tripId == trip._id && typeof data.lat === 'number') {
                 setBusLocation({ latitude: data.lat, longitude: data.lng });
                 setSpeed(data.speed || 0);
                 setHeading(data.heading || 0);

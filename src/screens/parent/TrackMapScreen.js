@@ -113,7 +113,7 @@ const TrackMapScreen = ({ route, navigation }) => {
         // We will try to fetchMyBus if no ID is passed
     }
 
-    const { connectionStatus, onLocationUpdate, joinBus, isConnected } = useTrackingSocket("PARENT");
+    const { connectionStatus, onLocationUpdate, joinBus, joinTrip, isConnected } = useTrackingSocket("PARENT");
 
     useEffect(() => {
         if (!busId) {
@@ -128,13 +128,14 @@ const TrackMapScreen = ({ route, navigation }) => {
     useEffect(() => {
         if (busId) {
             joinBus(busId);
+            // Also join by trip if we have an active trip ID (though here we mostly have busId)
         }
     }, [busId, connectionStatus, joinBus]);
 
     // HANDLE INCOMING UPDATES
     useEffect(() => {
         const cleanup = onLocationUpdate((data) => {
-            if (data && data.busId === busId && typeof data.lat === 'number' && typeof data.lng === 'number') {
+            if (data && data.busId == busId && typeof data.lat === 'number' && typeof data.lng === 'number') {
                 const newLoc = { latitude: data.lat, longitude: data.lng };
                 setBusLocation(newLoc);
                 setSpeed(data.speed || 0);
