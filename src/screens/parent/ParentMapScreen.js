@@ -7,14 +7,26 @@ import MapComponent from "../../components/MapComponent";
 import { useTrackingSocket } from "../../hooks/useTrackingSocket";
 
 const ParentMapScreen = ({ route, navigation }) => {
-    const { tripId, bus } = route.params;
+    const { tripId, bus } = route.params || {};
+
+    if (!tripId && !bus) {
+        return (
+            <View style={styles.center}>
+                <Text style={{ color: "#718096" }}>No active trip found.</Text>
+                <TouchableOpacity onPress={() => navigation.goBack()} style={{ marginTop: 20 }}>
+                    <Text style={{ color: "#4c51bf", fontWeight: 'bold' }}>Go Back</Text>
+                </TouchableOpacity>
+            </View>
+        );
+    }
     const [busDetails] = useState(bus || null);
     const [busLocation, setBusLocation] = useState(null);
     const [speed, setSpeed] = useState(0);
     const [heading, setHeading] = useState(0);
-    const { connectionStatus, onLocationUpdate, setConnectionStatus } = useTrackingSocket("PARENT");
+    const { connectionStatus, onLocationUpdate } = useTrackingSocket("PARENT");
     const [lastUpdated, setLastUpdated] = useState("");
     const [loading, setLoading] = useState(true);
+    const [mode, setMode] = useState('MORNING');
 
     useEffect(() => {
         fetchInitialLocation();
@@ -27,6 +39,7 @@ const ParentMapScreen = ({ route, navigation }) => {
                 setSpeed(data.speed || 0);
                 setHeading(data.heading || 0);
                 setLastUpdated(new Date(data.time || Date.now()).toLocaleTimeString());
+                if (data.mode) setMode(data.mode);
             }
         });
 
@@ -52,13 +65,13 @@ const ParentMapScreen = ({ route, navigation }) => {
                 setBusLocation(loc);
                 setSpeed(res.data.speed || 0);
                 setLastUpdated(new Date(res.data.timestamp || Date.now()).toLocaleTimeString());
+                if (res.data.type) setMode(res.data.type); // type is the field name in Trip model
+            } else if (res.data && res.data.status === "offline") {
+                console.log("Bus is currently offline.");
+                setBusLocation(null);
             }
         } catch (err) {
-            if (err.response?.status === 404) {
-                console.log("Bus is currently offline or no trip data found.");
-            } else {
-                console.log("Error fetching location:", err.message);
-            }
+            console.log("Error fetching location:", err.message);
         } finally {
             setLoading(false);
         }
@@ -82,6 +95,7 @@ const ParentMapScreen = ({ route, navigation }) => {
                 isDriver={false}
                 connectionStatus={connectionStatus}
                 lastUpdated={lastUpdated}
+                mode={mode}
             />
 
             <SafeAreaView style={styles.backBtnContainer}>

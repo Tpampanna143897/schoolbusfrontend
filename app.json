@@ -17,9 +17,7 @@
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#ffffff"
       },
-      "edgeToEdgeEnabled": true,
       "package": "com.schoolbus.frontend",
-      "usesCleartextTraffic": true,
       "permissions": [
         "ACCESS_FINE_LOCATION",
         "ACCESS_COARSE_LOCATION",
@@ -54,7 +52,8 @@
       [
         "expo-location",
         {
-          "locationAlwaysAndWhenInUsePermission": "Allow school bus tracking even in background"
+          "locationAlwaysAndWhenInUsePermission": "Allow school bus tracking even in background",
+          "isAndroidBackgroundLocationEnabled": true
         }
       ]
     ],

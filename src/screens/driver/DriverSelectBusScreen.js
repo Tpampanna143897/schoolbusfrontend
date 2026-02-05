@@ -12,6 +12,7 @@ const DriverSelectBusScreen = ({ navigation }) => {
     const [routes, setRoutes] = useState([]);
     const [selectedBusId, setSelectedBusId] = useState('');
     const [selectedRouteId, setSelectedRouteId] = useState('');
+    const [selectedMode, setSelectedMode] = useState('MORNING');
     const [selectedBus, setSelectedBus] = useState(null);
     const [selectedRoute, setSelectedRoute] = useState(null);
     const [loading, setLoading] = useState(true);
@@ -166,24 +167,51 @@ const DriverSelectBusScreen = ({ navigation }) => {
             // 3) Lock bus so only one driver can activate it
             await driverApi.selectBus({
                 busId: selectedBusId,
-                shift: "MORNING" // Example shift, could be dynamic
+                shift: selectedMode
             });
+            console.log("Bus selected with mode:", selectedMode);
 
             const res = await driverApi.startTrip({
                 busId: selectedBusId,
-                routeId: selectedRouteId
+                routeId: selectedRouteId,
+                type: selectedMode
             });
 
             navigation.navigate("DriverMap", {
                 bus: { ...selectedBus, route: selectedRoute },
-                tripId: res.data.tripId
+                tripId: res.data.tripId,
+                mode: selectedMode
             });
         } catch (error) {
             const msg = error.response?.data?.message || "Failed to start trip.";
-            if (msg.includes("already")) {
+            if (error.response?.status === 409) {
+                // Specialized handling for conflict
+                Alert.alert(
+                    "Bus Already Active",
+                    "This bus is already being tracked by another session. You can take over if you are authorized.",
+                    [
+                        { text: "Cancel", style: "cancel" },
+                        {
+                            text: "Force Take-Over",
+                            style: "destructive",
+                            onPress: async () => {
+                                try {
+                                    await driverApi.resetBus(selectedBusId);
+                                    Alert.alert("Success", "Bus released. You can now start your journey.");
+                                    fetchInitialData();
+                                } catch (e) {
+                                    Alert.alert("Error", e.response?.data?.message || "Failed to reset bus.");
+                                }
+                            }
+                        }
+                    ]
+                );
+            } else if (msg.includes("already")) {
                 fetchInitialData();
+                Alert.alert("Error", msg);
+            } else {
+                Alert.alert("Error", msg);
             }
-            Alert.alert("Error", msg);
         } finally {
             setStartingTrip(false);
         }
@@ -221,6 +249,16 @@ const DriverSelectBusScreen = ({ navigation }) => {
                         placeholder="Choose a route..."
                         items={routes.map(r => ({ id: r._id, label: r.name }))}
                     />
+
+                    <Dropdown
+                        label="3. Trip Mode"
+                        selectedValue={selectedMode}
+                        onValueChange={(val) => setSelectedMode(val)}
+                        items={[
+                            { id: 'MORNING', label: 'Morning (Home to School)' },
+                            { id: 'EVENING', label: 'Evening (School to Home)' }
+                        ]}
+                    />
                 </View>
 
                 {locationPermission !== 'granted' && (
@@ -240,15 +278,16 @@ const DriverSelectBusScreen = ({ navigation }) => {
 
                 {hasActiveTrip && (
                     <View style={styles.activeWarning}>
-                        <Ionicons name="warning" size={24} color="#e53e3e" />
-                        <View style={{ flex: 1, marginLeft: 15 }}>
-                            <Text style={styles.warningTitle}>Ongoing Session Detected</Text>
-                            <Text style={styles.warningText}>
-                                Bus {hasActiveTrip.busId?.busNumber} is currently active.
-                            </Text>
+                        <View style={styles.warningHeader}>
+                            <Ionicons name="alert-circle" size={24} color="#c53030" />
+                            <Text style={styles.warningTitle}>Bus Busy / Stuck Session</Text>
                         </View>
-                        <TouchableOpacity style={styles.resolveBtn} onPress={handleForceEnd}>
-                            <Text style={styles.resolveBtnTxt}>FIX</Text>
+                        <Text style={styles.warningText}>
+                            Bus {hasActiveTrip.busId?.busNumber} is already marked as ACTIVE. You must release it to start a new ride.
+                        </Text>
+                        <TouchableOpacity style={styles.resolveBtnLarge} onPress={handleForceEnd}>
+                            <Ionicons name="flash" size={18} color="white" />
+                            <Text style={styles.resolveBtnTxtLarge}>Clear Stuck Session & Take Over</Text>
                         </TouchableOpacity>
                     </View>
                 )}
@@ -317,10 +356,13 @@ const styles = StyleSheet.create({
     startBtn: { backgroundColor: '#48bb78', flexDirection: 'row', justifyContent: 'center', alignItems: 'center', padding: 20, borderRadius: 16, elevation: 8 },
     disabledBtn: { backgroundColor: '#a0aec0' },
     startBtnText: { color: 'white', fontWeight: 'bold', fontSize: 18, marginLeft: 10 },
-    activeWarning: { backgroundColor: '#fff5f5', padding: 20, borderRadius: 20, flexDirection: 'row', alignItems: 'center', marginBottom: 20, borderWidth: 1, borderColor: '#feb2b2' },
-    warningTitle: { fontWeight: 'bold', color: '#c53030', fontSize: 16 },
-    warningText: { color: '#e53e3e', fontSize: 12, marginTop: 2 },
-    resolveBtn: { backgroundColor: '#c53030', paddingHorizontal: 12, paddingVertical: 8, borderRadius: 8 },
+    activeWarning: { backgroundColor: '#fff5f5', padding: 20, borderRadius: 24, marginBottom: 20, borderWidth: 1, borderColor: '#feb2b2', elevation: 2 },
+    warningHeader: { flexDirection: 'row', alignItems: 'center', marginBottom: 10 },
+    warningTitle: { fontWeight: 'bold', color: '#c53030', fontSize: 18, marginLeft: 10 },
+    warningText: { color: '#e53e3e', fontSize: 14, lineHeight: 20, marginBottom: 15 },
+    resolveBtnLarge: { backgroundColor: '#c53030', flexDirection: 'row', justifyContent: 'center', alignItems: 'center', padding: 15, borderRadius: 12 },
+    resolveBtnTxtLarge: { color: 'white', fontWeight: 'bold', fontSize: 14, marginLeft: 8 },
+    resolveBtn: { backgroundColor: '#dd6b20', paddingHorizontal: 12, paddingVertical: 8, borderRadius: 8 },
     resolveBtnTxt: { color: 'white', fontWeight: 'bold', fontSize: 12 },
 });
 

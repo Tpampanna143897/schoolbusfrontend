@@ -11,4 +11,5 @@ export const driverApi = {
     getStudents: (busId) => client.get(`/students/bus/${busId}`),
     getRoutes: () => client.get('/routes'), // Non-admin route for selection
     markAttendance: (data) => client.post('/attendance', data),
+    resetBus: (busId) => client.post('/driver/reset-bus', { busId }),
 };

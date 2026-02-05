@@ -9,7 +9,15 @@ import { useTrackingSocket } from "../../hooks/useTrackingSocket";
 import MapComponent from "../../components/MapComponent";
 
 const AdminMapScreen = ({ route, navigation }) => {
-    const { trip } = route.params;
+    const { trip } = route.params || {};
+
+    if (!trip) {
+        return (
+            <View style={styles.center}>
+                <Text style={styles.loadingText}>Loading trip details...</Text>
+            </View>
+        );
+    }
     const [busLocation, setBusLocation] = useState(null);
     const [speed, setSpeed] = useState(0);
     const [heading, setHeading] = useState(0);

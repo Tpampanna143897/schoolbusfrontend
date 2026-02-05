@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, FlatList, TouchableOpacity, ActivityIndicator, RefreshControl } from 'react-native';
+import { View, Text, StyleSheet, FlatList, TouchableOpacity, ActivityIndicator, RefreshControl, Alert } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { adminApi } from '../../api/adminApi';
@@ -27,6 +27,33 @@ const AdminLiveTripsScreen = ({ navigation }) => {
         }
     };
 
+    const handleForceStop = (tripId, busNumber) => {
+        Alert.alert(
+            "Force Stop Trip?",
+            `Are you sure you want to end the journey for Bus ${busNumber}?`,
+            [
+                { text: "Cancel", style: "cancel" },
+                {
+                    text: "Force Stop",
+                    style: "destructive",
+                    onPress: async () => {
+                        try {
+                            // Find the bus ID for this trip to call the reset endpoint
+                            const trip = trips.find(t => t._id === tripId);
+                            if (trip && trip.busId?._id) {
+                                await adminApi.resetBus(trip.busId._id);
+                                Alert.alert("Success", "Trip stopped and bus released.");
+                                fetchTrips();
+                            }
+                        } catch (error) {
+                            Alert.alert("Error", "Failed to force stop trip.");
+                        }
+                    }
+                }
+            ]
+        );
+    };
+
     const renderTripItem = ({ item }) => (
         <TouchableOpacity
             style={styles.tripCard}
@@ -47,6 +74,12 @@ const AdminLiveTripsScreen = ({ navigation }) => {
                         {item.status}
                     </Text>
                 </View>
+                <TouchableOpacity
+                    style={styles.forceStopBtn}
+                    onPress={() => handleForceStop(item._id, item.busId?.busNumber)}
+                >
+                    <Ionicons name="stop-circle" size={24} color="#f56565" />
+                </TouchableOpacity>
             </View>
 
             <View style={styles.divider} />
@@ -132,6 +165,10 @@ const styles = StyleSheet.create({
     divider: { height: 1, backgroundColor: '#f1f5f9', marginBottom: 15 },
     cardDetail: { flexDirection: 'row', alignItems: 'center' },
     detailText: { fontSize: 14, color: '#4a5568', marginLeft: 6 },
+    forceStopBtn: {
+        padding: 5,
+        marginLeft: 10
+    },
     center: { flex: 1, justifyContent: 'center', alignItems: 'center' },
     loadingText: { marginTop: 15, color: '#718096', fontSize: 16 },
     emptyContainer: { alignItems: 'center', marginTop: 100 },

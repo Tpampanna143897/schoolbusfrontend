@@ -5,6 +5,49 @@ import { AuthProvider } from "./src/context/AuthContext";
 import AppNavigator from "./src/navigation/AppNavigator";
 import { StatusBar } from "expo-status-bar";
 import * as SplashScreen from "expo-splash-screen";
+import * as TaskManager from 'expo-task-manager';
+import * as Location from 'expo-location';
+
+import * as SecureStore from 'expo-secure-store';
+import axios from 'axios';
+
+const LOCATION_TASK_NAME = 'background-location-task';
+
+// Define the background task
+TaskManager.defineTask(LOCATION_TASK_NAME, async ({ data, error }) => {
+  if (error) {
+    console.error("[TASK_MANAGER] Error in background location task:", error);
+    return;
+  }
+  if (data) {
+    const { locations } = data;
+    const location = locations[0];
+    if (!location) return;
+
+    try {
+      // 1. Fetch stored session info
+      const sessionStr = await SecureStore.getItemAsync('active_trip_session');
+      if (!sessionStr) return;
+
+      const { tripId, busId, driverId, baseUrl } = JSON.parse(sessionStr);
+      if (!tripId || !baseUrl) return;
+
+      // 2. Sync to REST API (Sockets often disconnect in strict background)
+      // Use raw axios to avoid interceptor issues in headless task
+      await axios.post(`${baseUrl}/tracking/update`, {
+        tripId, busId, driverId,
+        lat: location.coords.latitude,
+        lng: location.coords.longitude,
+        speed: Math.max(0, Math.round((location.coords.speed || 0) * 3.6)),
+        heading: location.coords.heading || 0
+      }, { timeout: 10000 });
+
+      console.log('[TASK_MANAGER] BG-Sync Success for Trip:', tripId);
+    } catch (e) {
+      console.log('[TASK_MANAGER] BG-Sync silent fail (Network or Session):', e.message);
+    }
+  }
+});
 
 // Keep the splash screen visible while we fetch resources
 SplashScreen.preventAutoHideAsync().catch(() => {

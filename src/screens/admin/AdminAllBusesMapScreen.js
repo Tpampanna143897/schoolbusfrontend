@@ -6,6 +6,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { SafeAreaView } from "react-native-safe-area-context";
 import client from "../../api/client";
 import { adminApi } from "../../api/adminApi";
+import MapComponent from "../../components/MapComponent";
 
 import { useTrackingSocket } from "../../hooks/useTrackingSocket";
 
@@ -48,7 +49,7 @@ const AdminAllBusesMapScreen = ({ navigation }) => {
 
     const fitMap = (currentTrips) => {
         const coords = currentTrips
-            .filter(t => t.location)
+            .filter(t => t.location && typeof t.location.lat === 'number' && !isNaN(t.location.lat))
             .map(t => ({ latitude: t.location.lat, longitude: t.location.lng }));
 
         if (coords.length > 0) {
@@ -75,6 +76,16 @@ const AdminAllBusesMapScreen = ({ navigation }) => {
         }
     };
 
+    // Map all active trips to the "buses" format for the smooth multi-marker support
+    const displayBuses = trips
+        .filter(t => t && t.location && typeof t.location.lat === 'number' && !isNaN(t.location.lat))
+        .map(t => ({
+            id: t._id,
+            location: { latitude: t.location.lat, longitude: t.location.lng },
+            heading: t.location.heading || 0,
+            busNumber: t.busId?.busNumber || "Bus"
+        }));
+
     if (loading) return (
         <View style={styles.center}>
             <ActivityIndicator size="large" color="#4c51bf" />
@@ -84,46 +95,14 @@ const AdminAllBusesMapScreen = ({ navigation }) => {
 
     return (
         <View style={styles.container}>
-            <MapView
-                ref={mapRef}
-                style={styles.map}
-                provider={PROVIDER_GOOGLE}
-                initialRegion={{
-                    latitude: 12.9716,
-                    longitude: 77.5946,
-                    latitudeDelta: 0.1,
-                    longitudeDelta: 0.1,
+            <MapComponent
+                buses={displayBuses}
+                connectionStatus={trips.length > 0 ? `Fleet: ${trips.length} Active` : "Scanning Fleet..."}
+                onBusPress={(bus) => {
+                    const trip = trips.find(t => t._id === bus.id);
+                    if (trip) navigation.navigate("AdminMap", { trip });
                 }}
-            >
-                {trips.filter(t => t.location).map(trip => (
-                    <Marker
-                        key={trip._id}
-                        coordinate={{ latitude: trip.location.lat, longitude: trip.location.lng }}
-                        title={trip.busId?.busNumber || "School Bus"}
-                    >
-                        <View style={styles.markerContainer}>
-                            <Image
-                                source={{ uri: "https://cdn-icons-png.flaticon.com/512/3448/3448339.png" }}
-                                style={styles.busIcon}
-                            />
-                            <View style={styles.labelContainer}>
-                                <Text style={styles.labelText}>{trip.busId?.busNumber}</Text>
-                            </View>
-                        </View>
-                        <Callout tooltip onPress={() => navigation.navigate("AdminMap", { trip })}>
-                            <View style={styles.callout}>
-                                <Text style={styles.calloutTitle}>{trip.busId?.busNumber}</Text>
-                                <Text style={styles.calloutText}>Driver: {trip.driverId?.name}</Text>
-                                <Text style={styles.calloutText}>Route: {trip.routeId?.name}</Text>
-                                <Text style={styles.calloutText}>Speed: {trip.location.speed} km/h</Text>
-                                <View style={styles.detailBtn}>
-                                    <Text style={styles.detailText}>TAP TO TRACK LIVE</Text>
-                                </View>
-                            </View>
-                        </Callout>
-                    </Marker>
-                ))}
-            </MapView>
+            />
 
             <SafeAreaView style={styles.headerOverlay} edges={['top']}>
                 <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backBtn}>

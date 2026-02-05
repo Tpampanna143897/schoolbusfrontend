@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Modal, Alert, Switch } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Modal, Alert, Switch, RefreshControl } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { adminApi } from '../../api/adminApi';
@@ -11,6 +11,7 @@ const AdminBuses = () => {
     const [routes, setRoutes] = useState([]);
     const [loading, setLoading] = useState(true);
     const [modalVisible, setModalVisible] = useState(false);
+    const [refreshing, setRefreshing] = useState(false);
 
     // Form state
     const [busNumber, setBusNumber] = useState('');
@@ -30,10 +31,40 @@ const AdminBuses = () => {
             setBuses(busesRes.data || []);
             setRoutes(routesRes.data || []);
         } catch (error) {
+            console.error("Fetch Data Error:", error);
             Alert.alert('Error', 'Failed to fetch data');
         } finally {
             setLoading(false);
         }
+    };
+
+    const onRefresh = React.useCallback(async () => {
+        setRefreshing(true);
+        await fetchInitialData();
+        setRefreshing(false);
+    }, []);
+
+    const handleResetBus = (busId) => {
+        Alert.alert(
+            "Reset Bus?",
+            "This will clear the active trip and driver for this bus. Use this only if a session is stuck.",
+            [
+                { text: "Cancel", style: "cancel" },
+                {
+                    text: "Reset",
+                    style: "destructive",
+                    onPress: async () => {
+                        try {
+                            await adminApi.resetBus(busId);
+                            Alert.alert("Success", "Bus reset successfully");
+                            fetchInitialData();
+                        } catch (error) {
+                            Alert.alert("Error", "Failed to reset bus");
+                        }
+                    }
+                }
+            ]
+        );
     };
 
     const handleCreateBus = async () => {
@@ -79,7 +110,12 @@ const AdminBuses = () => {
                 </TouchableOpacity>
             </View>
 
-            <ScrollView style={styles.content}>
+            <ScrollView
+                style={styles.content}
+                refreshControl={
+                    <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
+                }
+            >
                 {buses.map(bus => (
                     <View key={bus._id} style={styles.busCard}>
                         <View style={styles.busHeader}>
@@ -93,12 +129,16 @@ const AdminBuses = () => {
                         </View>
 
                         <View style={styles.statusRow}>
-                            <View style={[styles.statusBadge, { backgroundColor: bus.status === 'ONLINE' ? '#f0fff4' : '#f7fafc' }]}>
-                                <Text style={[styles.statusText, { color: bus.status === 'ONLINE' ? '#2f855a' : '#718096' }]}>
+                            <View style={[styles.statusBadge, { backgroundColor: bus.status === 'ONLINE' ? '#c6f6d5' : '#edf2f7' }]}>
+                                <Text style={[styles.statusText, { color: bus.status === 'ONLINE' ? '#22543d' : '#4a5568' }]}>
                                     {bus.status || 'OFFLINE'}
                                 </Text>
                             </View>
-                            <Text style={styles.activeLabel}>{bus.isActive ? 'Service Active' : 'Service Inactive'}</Text>
+                            <View style={[styles.activeIndicator, { backgroundColor: bus.isActive ? '#ebf8ff' : '#fff5f5' }]}>
+                                <Text style={[styles.activeLabel, { color: bus.isActive ? '#2b6cb0' : '#c53030' }]}>
+                                    {bus.isActive ? 'Fleet Enabled' : 'Fleet Disabled'}
+                                </Text>
+                            </View>
                         </View>
 
                         <View style={styles.detailRow}>
@@ -107,9 +147,23 @@ const AdminBuses = () => {
                         </View>
 
                         {bus.activeTrip && (
-                            <View style={styles.tripBadge}>
-                                <Ionicons name="play-circle" size={16} color="#48bb78" />
-                                <Text style={styles.tripText}>In Trip Session</Text>
+                            <View style={styles.sessionCard}>
+                                <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                                    <View>
+                                        <View style={styles.tripBadge}>
+                                            <Ionicons name="play-circle" size={16} color="#48bb78" />
+                                            <Text style={styles.tripText}>In Active Journey</Text>
+                                        </View>
+                                        <Text style={styles.sessionDriver}>By: {bus.activeDriverId?.name || "Driver"}</Text>
+                                    </View>
+                                    <TouchableOpacity
+                                        style={styles.resetBtn}
+                                        onPress={() => handleResetBus(bus._id)}
+                                    >
+                                        <Ionicons name="close-circle" size={20} color="#f56565" />
+                                        <Text style={styles.resetBtnText}>Stop Ride</Text>
+                                    </TouchableOpacity>
+                                </View>
                             </View>
                         )}
                     </View>
@@ -160,11 +214,16 @@ const styles = StyleSheet.create({
     statusRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 15 },
     statusBadge: { paddingHorizontal: 12, paddingVertical: 4, borderRadius: 8, marginRight: 10 },
     statusText: { fontSize: 12, fontWeight: 'bold' },
-    activeLabel: { fontSize: 14, color: '#a0aec0', fontWeight: '500' },
+    activeIndicator: { paddingHorizontal: 10, paddingVertical: 4, borderRadius: 6 },
+    activeLabel: { fontSize: 12, fontWeight: '700' },
     detailRow: { flexDirection: 'row', alignItems: 'center', marginTop: 8 },
     detailText: { fontSize: 14, color: '#4a5568', marginLeft: 10 },
-    tripBadge: { flexDirection: 'row', alignItems: 'center', marginTop: 15, padding: 10, backgroundColor: '#f0fff4', borderRadius: 12 },
+    sessionCard: { marginTop: 15, padding: 15, backgroundColor: '#f0fff4', borderRadius: 16, borderLeftWidth: 4, borderLeftColor: '#48bb78' },
+    tripBadge: { flexDirection: 'row', alignItems: 'center' },
     tripText: { fontSize: 14, color: '#2f855a', fontWeight: 'bold', marginLeft: 8 },
+    sessionDriver: { fontSize: 12, color: '#718096', marginTop: 4, marginLeft: 24 },
+    resetBtn: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 12, paddingVertical: 8, backgroundColor: '#fff5f5', borderRadius: 12, borderWidth: 1, borderColor: '#feb2b2' },
+    resetBtnText: { fontSize: 13, color: '#e53e3e', fontWeight: 'bold', marginLeft: 4 },
     modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' },
     modalContent: { backgroundColor: 'white', borderTopLeftRadius: 30, borderTopRightRadius: 30, padding: 30, maxHeight: '85%' },
     modalHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 25 },

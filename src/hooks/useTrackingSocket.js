@@ -20,13 +20,12 @@ export const useTrackingSocket = (role) => {
 
         // 1) Implement a production-safe Socket.IO client in Expo
         socketRef.current = io(socketUrl, {
-            transports: ["websocket", "polling"], // Uses websocket + polling fallback
+            transports: ["websocket", "polling"],
             reconnection: true,
-            reconnectionAttempts: Infinity,
-            reconnectionDelay: 1000,
-            reconnectionDelayMax: 5000,
+            reconnectionAttempts: 10,
+            reconnectionDelay: 2000,
+            reconnectionDelayMax: 10000,
             timeout: 20000,
-            forceNew: true,
             autoConnect: true
         });
 
@@ -35,19 +34,15 @@ export const useTrackingSocket = (role) => {
             setConnectionStatus("Live ✔");
             setIsConnected(true);
 
-            // 5) Flush queued updates when the socket reconnects
+            // Re-identify/join based on role if needed
+            if (role === "ADMIN_FLEET") joinAdmin();
+
             flushQueue();
         });
 
-        // 1) Handles connect_error, disconnect, and error events
         socketRef.current.on("connect_error", (err) => {
             console.warn(`[SOCKET] ${role} connect_error:`, err.message);
-            // setConnectionStatus("Socket Error ❌"); // Don't show error immediately to user, let it retry
-            setIsConnected(false);
-        });
-
-        socketRef.current.on("error", (err) => {
-            console.error(`[SOCKET] ${role} error:`, err);
+            setConnectionStatus("Connecting... ⏳");
             setIsConnected(false);
         });
 
@@ -56,10 +51,8 @@ export const useTrackingSocket = (role) => {
             setConnectionStatus("Disconnected ⚠️");
             setIsConnected(false);
 
-            // 1) Prevents unhandled socket exceptions & Handles Render sleep reconnects
-            if (reason === "io server disconnect") {
-                // the disconnection was initiated by the server, you need to reconnect manually
-                socketRef.current.connect();
+            if (reason === "io server disconnect" || reason === "transport close") {
+                setTimeout(() => socketRef.current?.connect(), 5000);
             }
         });
 

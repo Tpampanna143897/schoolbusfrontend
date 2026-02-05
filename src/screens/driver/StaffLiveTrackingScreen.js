@@ -54,6 +54,16 @@ const StaffLiveTrackingScreen = ({ route }) => {
         </View>
     );
 
+    // Map all active trips to the "buses" format for the smooth multi-marker support
+    const displayBuses = trips
+        .filter(t => t.location && typeof t.location.lat === 'number')
+        .map(t => ({
+            id: t._id,
+            location: { latitude: t.location.lat, longitude: t.location.lng },
+            heading: t.location.heading || 0,
+            busNumber: t.busId?.busNumber || "Bus"
+        }));
+
     // If a focusRoute is provided, we prefer showing that trip primarily
     const activeTrip = focusRoute
         ? trips.find(t => (t.routeId?._id || t.routeId) === (focusRoute._id || focusRoute))
@@ -62,11 +72,12 @@ const StaffLiveTrackingScreen = ({ route }) => {
     return (
         <View style={styles.container}>
             <MapComponent
+                buses={displayBuses}
                 busLocation={activeTrip?.location ? { latitude: activeTrip.location.lat, longitude: activeTrip.location.lng } : null}
                 busDetails={activeTrip?.busId}
                 speed={activeTrip?.location?.speed || 0}
                 routeStops={activeTrip?.routeId?.stops || []}
-                connectionStatus={activeTrip ? "Monitoring Live" : "Scanning for active trips..."}
+                connectionStatus={trips.length > 0 ? `Monitoring ${trips.length} Live Buses` : "Scanning for active trips..."}
             />
             {!activeTrip && trips.length > 0 && (
                 <View style={styles.overlay}>

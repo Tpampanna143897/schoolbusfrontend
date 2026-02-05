@@ -109,6 +109,10 @@ const TrackMapScreen = ({ route, navigation }) => {
     const [lastUpdated, setLastUpdated] = useState("");
     const [loading, setLoading] = useState(true);
 
+    if (!busId && !route.params?.busId) {
+        // We will try to fetchMyBus if no ID is passed
+    }
+
     const { connectionStatus, onLocationUpdate, joinBus } = useTrackingSocket("PARENT");
 
     useEffect(() => {

@@ -8,8 +8,10 @@ import { Ionicons } from "@expo/vector-icons";
 import MapComponent from "../../components/MapComponent";
 import { useTrackingSocket } from "../../hooks/useTrackingSocket";
 
+import * as SecureStore from 'expo-secure-store';
+
 const DriverMapScreen = ({ route, navigation }) => {
-    const { bus, tripId } = route.params;
+    const { bus, tripId, mode } = route.params;
     const [isTripActive, setIsTripActive] = useState(true);
     const [isPaused, setIsPaused] = useState(false);
     const [currentLocation, setCurrentLocation] = useState(null);
@@ -48,10 +50,18 @@ const DriverMapScreen = ({ route, navigation }) => {
         appState.current = nextAppState;
     };
 
-    const stopTracking = () => {
+    const stopTracking = async () => {
         if (locationSubscription.current) {
             locationSubscription.current.remove();
             locationSubscription.current = null;
+        }
+        try {
+            const hasStarted = await Location.hasStartedLocationUpdatesAsync('background-location-task');
+            if (hasStarted) {
+                await Location.stopLocationUpdatesAsync('background-location-task');
+            }
+        } catch (e) {
+            console.log("Stop BG error:", e);
         }
     };
 
@@ -59,8 +69,13 @@ const DriverMapScreen = ({ route, navigation }) => {
         try {
             const { status: fgStatus } = await Location.requestForegroundPermissionsAsync();
             if (fgStatus !== 'granted') {
-                Alert.alert("Permission Required", "GPS permission is needed for live tracking.");
+                Alert.alert("Permission Required", "Foreground location permission is needed.");
                 return;
+            }
+
+            const { status: bgStatus } = await Location.requestBackgroundPermissionsAsync();
+            if (bgStatus !== 'granted') {
+                Alert.alert("Permission Required", "Background location is required to keep tracking while app is closed.");
             }
 
             // Immediately get current position to center map
@@ -72,29 +87,36 @@ const DriverMapScreen = ({ route, navigation }) => {
                 const speedKmh = Math.max(0, Math.round((speedMs || 0) * 3.6));
                 setSpeed(speedKmh);
                 setHeading(course || 0);
-
-                // Send initial update so parents see location immediately
                 sendLocationUpdate(newLoc, speedKmh, course);
             }
 
-            stopTracking();
+            await Location.startLocationUpdatesAsync('background-location-task', {
+                accuracy: Location.Accuracy.High,
+                timeInterval: 5000,
+                distanceInterval: 10,
+                foregroundService: {
+                    notificationTitle: "School Bus Tracking",
+                    notificationBody: "Tracking your location for students",
+                    notificationColor: "#4c51bf"
+                }
+            });
+
+            // Maintain a foreground listener for UI updates
             locationSubscription.current = await Location.watchPositionAsync(
                 {
                     accuracy: Location.Accuracy.High,
-                    timeInterval: 4000,
-                    distanceInterval: 10,
+                    timeInterval: 5000,
+                    distanceInterval: 5,
                 },
                 (loc) => {
                     if (loc && loc.coords) {
                         const { latitude, longitude, speed: speedMs, heading: course } = loc.coords;
                         const newLoc = { latitude, longitude };
                         setCurrentLocation(newLoc);
-
                         const speedKmh = Math.max(0, Math.round((speedMs || 0) * 3.6));
                         setSpeed(speedKmh);
                         setHeading(course || 0);
                         setLastUpdated(new Date().toLocaleTimeString());
-
                         sendLocationUpdate(newLoc, speedKmh, course);
                     }
                 }
@@ -105,28 +127,23 @@ const DriverMapScreen = ({ route, navigation }) => {
         }
     };
 
+    const lastRestSyncRef = useRef(0);
+
     const sendLocationUpdate = async (coords, speedKmh, course, retryCount = 0) => {
         if (!tripId || !coords.latitude || !coords.longitude || isPaused) return;
 
-        // Defensive checks for bus and user
         const busId = bus?._id || bus?.id;
         const driverId = user?._id || user?.id;
 
-        if (!busId || !driverId) {
-            console.warn("[TRACKING] Missing Bus ID or Driver ID. Update skipped.", { busId, driverId });
-            return;
-        }
+        if (!busId || !driverId) return;
 
         const now = Date.now();
-        if (now - lastEmitRef.current < 5000 && retryCount === 0) {
-            return;
-        }
+        // Throttle Socket emits to 5 seconds
+        if (now - lastEmitRef.current < 5000 && retryCount === 0) return;
         lastEmitRef.current = now;
 
         const payload = {
-            tripId,
-            busId,
-            driverId,
+            tripId, busId, driverId,
             lat: coords.latitude,
             lng: coords.longitude,
             speed: speedKmh,
@@ -134,18 +151,19 @@ const DriverMapScreen = ({ route, navigation }) => {
         };
 
         try {
-            // 1. WebSocket Emit
+            // 1. WebSocket Emit (High frequency)
             emitLocation(payload);
 
-            // 2. REST API Sync
-            await client.post('/tracking/update', payload);
+            // 2. REST API Sync (Low frequency - every 30s)
+            if (now - lastRestSyncRef.current > 30000 || retryCount > 0) {
+                lastRestSyncRef.current = now;
+                await client.post('/tracking/update', payload);
+            }
 
         } catch (err) {
-            console.log(`Failed to sync location (Attempt ${retryCount + 1}):`, err.message);
+            console.warn(`[GPS] Sync error (retry ${retryCount}):`, err.message);
             if (retryCount < 2) {
-                setTimeout(() => {
-                    sendLocationUpdate(coords, speedKmh, course, retryCount + 1);
-                }, 2000);
+                setTimeout(() => sendLocationUpdate(coords, speedKmh, course, retryCount + 1), 5000);
             }
         }
     };
@@ -200,6 +218,7 @@ const DriverMapScreen = ({ route, navigation }) => {
                 isDriver={true}
                 connectionStatus={isPaused ? "Paused ⏸" : connectionStatus}
                 lastUpdated={lastUpdated}
+                mode={mode}
             />
 
             <SafeAreaView style={styles.topOverlay} edges={['top']}>
@@ -209,8 +228,8 @@ const DriverMapScreen = ({ route, navigation }) => {
                             <View style={[styles.statusDot, { backgroundColor: isPaused ? '#cbd5e0' : '#48bb78' }]} />
                             <Text style={styles.routeText}>{bus?.busNumber || "Route #---"}</Text>
                         </View>
-                        <View style={[styles.liveBadge, isPaused && styles.pausedBadge]}>
-                            <Text style={styles.liveText}>{isPaused ? "PAUSED" : "LIVE"}</Text>
+                        <View style={[styles.liveBadge, isPaused ? styles.pausedBadge : styles.activeBadge]}>
+                            <Text style={[styles.liveText, isPaused ? styles.pausedText : styles.activeText]}>{isPaused ? "PAUSED" : "ACTIVE"}</Text>
                         </View>
                     </View>
                     <Text style={styles.stopText}>{bus?.route?.name || "Tracking Active"}</Text>
@@ -242,8 +261,12 @@ const DriverMapScreen = ({ route, navigation }) => {
                         <Ionicons name="bus" size={20} color="white" />
                     </View>
                     <View style={{ flex: 1, marginLeft: 12 }}>
-                        <Text style={styles.stopAddress}>{bus?.busNumber} En Route</Text>
-                        <View style={styles.badge}><Text style={styles.badgeText}>{isPaused ? "Journey Paused" : "Active"}</Text></View>
+                        <Text style={styles.stopAddress}>{bus?.busNumber} Tracking</Text>
+                        <View style={[styles.badge, { backgroundColor: isPaused ? '#fffaf0' : '#f0fff4' }]}>
+                            <Text style={[styles.badgeText, { color: isPaused ? '#c05621' : '#2f855a' }]}>
+                                {isPaused ? "Session Paused" : "Journey Active"}
+                            </Text>
+                        </View>
                     </View>
                 </View>
             </View>
@@ -272,8 +295,12 @@ const styles = StyleSheet.create({
     stopAddress: { fontSize: 17, fontWeight: 'bold', color: '#2d3748' },
     badge: { backgroundColor: '#ebf8ff', alignSelf: 'flex-start', paddingHorizontal: 10, paddingVertical: 4, borderRadius: 8, marginTop: 6 },
     badgeText: { fontSize: 12, color: '#3182ce', fontWeight: 'bold' },
-    liveBadge: { backgroundColor: '#fed7d7', paddingHorizontal: 10, paddingVertical: 4, borderRadius: 8 },
-    liveText: { color: '#e53e3e', fontSize: 12, fontWeight: '800' },
+    liveBadge: { paddingHorizontal: 12, paddingVertical: 6, borderRadius: 10 },
+    activeBadge: { backgroundColor: '#c6f6d5' },
+    activeText: { color: '#22543d', fontSize: 12, fontWeight: '900' },
+    pausedBadge: { backgroundColor: '#feebc8' },
+    pausedText: { color: '#744210', fontSize: 12, fontWeight: '900' },
+    liveText: { fontSize: 12, fontWeight: '800' },
 });
 
 export default DriverMapScreen;

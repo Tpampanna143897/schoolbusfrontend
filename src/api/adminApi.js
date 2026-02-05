@@ -15,6 +15,7 @@ export const adminApi = {
     getTripLocation: (tripId) => client.get(`/admin/trip-location/${tripId}`),
     createBus: (busData) => client.post('/admin/buses', busData),
     updateBusStatus: (id, isActive) => client.put(`/admin/buses/${id}/status`, { isActive }),
+    resetBus: (id) => client.post(`/admin/buses/${id}/reset`),
 
     // Student management
     getStudents: () => client.get('/admin/students'),

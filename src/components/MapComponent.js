@@ -11,6 +11,50 @@ import MapViewDirections from 'react-native-maps-directions';
 
 const GOOGLE_MAPS_APIKEY = "AIzaSyAu6yiOEH5Bo0ovfMKFvJ-_RS_Kgl-Qgn8"; // From app.json
 
+const AnimatedBusMarker = memo(({ bus, onPress }) => {
+    const isValidLoc = bus.location &&
+        typeof bus.location.latitude === 'number' &&
+        typeof bus.location.longitude === 'number';
+
+    const [animatedCoordinate] = useState(new AnimatedRegion({
+        latitude: isValidLoc ? bus.location.latitude : 12.9716,
+        longitude: isValidLoc ? bus.location.longitude : 77.5946,
+        latitudeDelta: 0,
+        longitudeDelta: 0,
+    }));
+
+    useEffect(() => {
+        if (isValidLoc) {
+            animatedCoordinate.timing({
+                latitude: bus.location.latitude,
+                longitude: bus.location.longitude,
+                duration: 1000,
+                useNativeDriver: false
+            }).start();
+        }
+    }, [bus.location, isValidLoc]);
+
+    if (!isValidLoc) return null;
+
+    return (
+        <Marker.Animated
+            coordinate={animatedCoordinate}
+            title={bus.busNumber || "School Bus"}
+            flat
+            anchor={{ x: 0.5, y: 0.5 }}
+            rotation={bus.heading || 0}
+            onPress={() => onPress && onPress(bus)}
+        >
+            <View style={styles.markerContainer}>
+                <Image
+                    source={{ uri: "https://cdn-icons-png.flaticon.com/512/3448/3448339.png" }}
+                    style={styles.busIcon}
+                />
+            </View>
+        </Marker.Animated>
+    );
+});
+
 const MapComponent = ({
     busLocation,
     busDetails,
@@ -24,7 +68,12 @@ const MapComponent = ({
     onCenterPress,
     routeStops = [], // [{ name, lat, lng }]
     showRoute = true,
+    mode = 'MORNING', // MORNING or EVENING
+    buses = [], // [{ id, location: { latitude, longitude }, heading, busNumber }] for multi-tracking
+    onBusPress, // Callback for when a bus is clicked in fleet mode
 }) => {
+    // School Location (Replace with actual if needed)
+    const SCHOOL_LOCATION = { latitude: 12.9716, longitude: 77.5946 }; // Example Bangalore coordinate
     const mapRef = useRef(null);
     const [followsBus, setFollowsBus] = useState(true);
     const [displayRoute, setDisplayRoute] = useState(showRoute);
@@ -37,24 +86,30 @@ const MapComponent = ({
     // Safety check for polyline coordinates
     const validRouteCoords = useMemo(() => {
         const combined = [...decodedCoords, ...routeCoordinates];
-        return combined.filter(c => c && typeof c.latitude === 'number' && typeof c.longitude === 'number');
+        return combined.filter(c => c && typeof c.latitude === 'number' && !isNaN(c.latitude) && typeof c.longitude === 'number' && !isNaN(c.longitude));
     }, [decodedCoords, routeCoordinates]);
 
-    // Format stops for Directions
-    const origin = (routeStops && routeStops.length > 0) ? { latitude: routeStops[0].lat, longitude: routeStops[0].lng } : null;
-    const destination = (routeStops && routeStops.length > 1) ? { latitude: routeStops[routeStops.length - 1].lat, longitude: routeStops[routeStops.length - 1].lng } : null;
-    const waypoints = (routeStops && routeStops.length > 2) ? routeStops.slice(1, -1).map(s => ({ latitude: s.lat, longitude: s.lng })) : [];
+    // Safety check for stops
+    const validStops = useMemo(() => {
+        return (routeStops || []).filter(s => s && typeof s.lat === 'number' && !isNaN(s.lat) && typeof s.lng === 'number' && !isNaN(s.lng));
+    }, [routeStops]);
 
-    // Smooth Animated Coordinate state
+    // Format stops for Directions
+    const origin = (validStops.length > 1) ? { latitude: validStops[0].lat, longitude: validStops[0].lng } : null;
+    const destination = (validStops.length > 1) ? { latitude: validStops[validStops.length - 1].lat, longitude: validStops[validStops.length - 1].lng } : null;
+    const waypoints = (validStops.length > 2) ? validStops.slice(1, -1).map(s => ({ latitude: s.lat, longitude: s.lng })) : [];
+
+    // Smooth Animated Coordinate state for SINGLE bus mode
     const [animatedCoordinate] = useState(new AnimatedRegion({
-        latitude: busLocation?.latitude || 12.9716,
-        longitude: busLocation?.longitude || 77.5946,
-        latitudeDelta: 0,
-        longitudeDelta: 0,
+        latitude: (typeof busLocation?.latitude === 'number' && !isNaN(busLocation.latitude)) ? busLocation.latitude : 12.9716,
+        longitude: (typeof busLocation?.longitude === 'number' && !isNaN(busLocation.longitude)) ? busLocation.longitude : 77.5946,
+        latitudeDelta: 0.005,
+        longitudeDelta: 0.005,
     }));
 
     useEffect(() => {
-        if (busLocation && typeof busLocation.latitude === 'number' && typeof busLocation.longitude === 'number') {
+        const isValidLoc = busLocation && typeof busLocation.latitude === 'number' && !isNaN(busLocation.latitude);
+        if (!buses.length && isValidLoc) {
             animatedCoordinate.timing({
                 latitude: busLocation.latitude,
                 longitude: busLocation.longitude,
@@ -62,7 +117,7 @@ const MapComponent = ({
                 useNativeDriver: false
             }).start();
 
-            if (followsBus) {
+            if (followsBus && typeof busLocation.latitude === 'number' && !isNaN(busLocation.latitude)) {
                 mapRef.current?.animateCamera({
                     center: {
                         latitude: busLocation.latitude,
@@ -72,7 +127,7 @@ const MapComponent = ({
                 }, { duration: 1000 });
             }
         }
-    }, [busLocation, followsBus]);
+    }, [busLocation, followsBus, buses.length]);
 
     const handleZoomIn = () => {
         mapRef.current?.getCamera().then(camera => {
@@ -88,7 +143,7 @@ const MapComponent = ({
 
     const handleToggleFollow = () => {
         setFollowsBus(!followsBus);
-        if (!followsBus && busLocation) {
+        if (!followsBus && busLocation && typeof busLocation.latitude === 'number' && !isNaN(busLocation.latitude) && typeof busLocation.longitude === 'number' && !isNaN(busLocation.longitude)) {
             mapRef.current?.animateToRegion({
                 latitude: busLocation.latitude,
                 longitude: busLocation.longitude,
@@ -98,12 +153,25 @@ const MapComponent = ({
         }
     };
 
-    const initialRegion = {
-        latitude: busLocation?.latitude || 12.9716,
-        longitude: busLocation?.longitude || 77.5946,
-        latitudeDelta: 0.01,
-        longitudeDelta: 0.01,
-    };
+    const initialRegion = useMemo(() => {
+        let lat = 12.9716;
+        let lng = 77.5946;
+
+        if (busLocation && typeof busLocation.latitude === 'number' && !isNaN(busLocation.latitude) && typeof busLocation.longitude === 'number' && !isNaN(busLocation.longitude)) {
+            lat = busLocation.latitude;
+            lng = busLocation.longitude;
+        } else if (buses.length > 0 && buses[0]?.location && typeof buses[0].location.latitude === 'number' && !isNaN(buses[0].location.latitude) && typeof buses[0].location.longitude === 'number' && !isNaN(buses[0].location.longitude)) {
+            lat = buses[0].location.latitude;
+            lng = buses[0].location.longitude;
+        }
+
+        return {
+            latitude: lat,
+            longitude: lng,
+            latitudeDelta: 0.015,
+            longitudeDelta: 0.015,
+        };
+    }, [busLocation, buses]);
 
     return (
         <View style={styles.container}>
@@ -131,7 +199,7 @@ const MapComponent = ({
                         strokeColor="#4c51bf"
                         optimizeWaypoints={true}
                         onReady={result => {
-                            if (!busLocation) {
+                            if (!busLocation && !buses.length) {
                                 mapRef.current?.fitToCoordinates(result.coordinates, {
                                     edgePadding: { right: 50, bottom: 50, left: 50, top: 100 },
                                 });
@@ -150,30 +218,52 @@ const MapComponent = ({
                 )}
 
                 {/* Stops Markers */}
-                {displayRoute && Array.isArray(routeStops) && routeStops.map((stop, index) => (
+                {displayRoute && validStops.map((stop, index) => (
                     <Marker
                         key={`stop-${index}`}
                         coordinate={{ latitude: stop.lat, longitude: stop.lng }}
                         title={stop.name}
-                        pinColor={index === 0 ? "green" : (index === routeStops.length - 1 ? "red" : "blue")}
+                        pinColor={index === 0 ? "green" : (index === validStops.length - 1 ? "red" : "blue")}
                     />
                 ))}
 
-                {/* Bus Marker */}
-                <Marker.Animated
-                    coordinate={animatedCoordinate}
-                    title={busDetails?.busNumber || "School Bus"}
-                    flat
-                    anchor={{ x: 0.5, y: 0.5 }}
-                    rotation={heading}
+                {/* School Marker */}
+                <Marker
+                    coordinate={SCHOOL_LOCATION}
+                    title="School"
+                    description="Drop-off/Pick-up point"
                 >
-                    <View style={styles.markerContainer}>
-                        <Image
-                            source={{ uri: "https://cdn-icons-png.flaticon.com/512/3448/3448339.png" }}
-                            style={styles.busIcon}
-                        />
+                    <View style={styles.schoolMarker}>
+                        <Ionicons name="school" size={24} color="white" />
                     </View>
-                </Marker.Animated>
+                </Marker>
+
+                {/* Single Bus Marker Mode */}
+                {!buses.length && busLocation && typeof busLocation.latitude === 'number' && !isNaN(busLocation.latitude) && (
+                    <Marker.Animated
+                        coordinate={animatedCoordinate}
+                        title={busDetails?.busNumber || "School Bus"}
+                        flat
+                        anchor={{ x: 0.5, y: 0.5 }}
+                        rotation={typeof heading === 'number' ? heading : 0}
+                    >
+                        <View style={styles.markerContainer}>
+                            <Image
+                                source={{ uri: "https://cdn-icons-png.flaticon.com/512/3448/3448339.png" }}
+                                style={styles.busIcon}
+                            />
+                        </View>
+                    </Marker.Animated>
+                )}
+
+                {/* Fleet Mode (Multi Bus) */}
+                {buses.map(bus => (
+                    <AnimatedBusMarker
+                        key={bus.id}
+                        bus={bus}
+                        onPress={onBusPress}
+                    />
+                ))}
             </MapView>
 
             {/* UI Overlays */}
@@ -337,6 +427,14 @@ const styles = StyleSheet.create({
         color: 'white',
         fontSize: 9,
         fontWeight: 'bold'
+    },
+    schoolMarker: {
+        backgroundColor: '#4c51bf',
+        padding: 8,
+        borderRadius: 20,
+        borderWidth: 2,
+        borderColor: 'white',
+        elevation: 5
     }
 });
 
