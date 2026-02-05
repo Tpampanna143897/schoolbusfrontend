@@ -48,6 +48,13 @@ const ParentMapScreen = ({ route, navigation }) => {
         };
     }, [tripId, bus?._id]);
 
+    // JOIN BUS ROOM FOR REAL-TIME UPDATES
+    useEffect(() => {
+        if (bus?._id || tripId) {
+            joinBus(bus?._id || tripId);
+        }
+    }, [bus?._id, tripId, connectionStatus]);
+
     const fetchInitialLocation = async () => {
         try {
             let res;
