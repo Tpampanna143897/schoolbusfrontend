@@ -22,9 +22,12 @@ const ProfileScreen = ({ navigation }) => {
     const fetchProfile = async () => {
         try {
             const res = await client.get("/auth/me");
-            setUser(res.data);
-            setName(res.data.name);
-            setEmail(res.data.email);
+            if (res.data?.success) {
+                const profile = res.data.data;
+                setUser(profile);
+                setName(profile.name);
+                setEmail(profile.email);
+            }
             setLoading(false);
         } catch (err) {
             console.log("Profile Fetch Error", err);
@@ -42,9 +45,11 @@ const ProfileScreen = ({ navigation }) => {
         try {
             setLoading(true);
             const res = await client.put("/auth/me", { name, email });
-            setUser({ ...user, name, email }); // Optimistic update or use res.data
-            setIsEditing(false);
-            Alert.alert("Success", "Profile updated successfully");
+            if (res.data?.success) {
+                setUser({ ...user, name, email });
+                setIsEditing(false);
+                Alert.alert("Success", "Profile updated successfully");
+            }
         } catch (err) {
             console.log("Update Error", err);
             Alert.alert("Error", "Failed to update profile");

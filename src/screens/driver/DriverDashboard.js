@@ -32,26 +32,32 @@ const DriverDashboard = ({ navigation }) => {
     const fetchActiveTrip = async () => {
         try {
             const res = await driverApi.getActiveTrip();
-            if (res.data && res.data._id) {
-                console.log("Active Trip Found:", res.data._id);
-                setActiveTrip(res.data);
-                const busId = res.data.busId?._id || res.data.busId;
+            const { success, data } = res.data || {};
+            if (success && data && data._id) {
+                console.log("Active Trip Found:", data._id);
+                setActiveTrip(data);
+                const busId = data.busId?._id || data.busId;
                 if (busId) fetchStudents(busId);
+            } else {
+                setActiveTrip(null);
             }
         } catch (err) {
-            console.log("No active trip found");
+            console.log("No active trip found:", err.message);
+            setActiveTrip(null);
         }
     };
 
     const fetchMyBus = async () => {
         try {
             const res = await driverApi.getBuses();
+            const { success, data } = res.data || {};
             // In dynamic mode, just showing the first available bus as "primary"
-            const busList = Array.isArray(res.data) ? res.data : [];
+            const busList = Array.isArray(data) ? data : [];
             const primaryBus = busList.find(b => b.isActive) || busList[0];
             setBus(primaryBus || null);
         } catch (err) {
-            console.log("No bus assigned or error", err);
+            console.log("No bus assigned or error", err.message);
+            setBus(null);
         }
     };
 
@@ -59,9 +65,11 @@ const DriverDashboard = ({ navigation }) => {
         if (!busId) return;
         try {
             const res = await driverApi.getStudents(busId);
-            setStudents(Array.isArray(res.data) ? res.data : []);
+            const { success, data } = res.data || {};
+            setStudents(Array.isArray(data) ? data : []);
         } catch (error) {
-            console.log("Error fetching students:", error);
+            console.log("Error fetching students:", error.message);
+            setStudents([]);
         }
     };
 

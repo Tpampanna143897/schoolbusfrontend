@@ -22,9 +22,15 @@ const ParentDashboard = ({ navigation }) => {
         setLoading(true);
         try {
             const res = await parentApi.getChildren();
-            setChildren(res.data || []);
+            const { success, data } = res.data || {};
+            if (success) {
+                setChildren(data || []);
+            } else {
+                setChildren([]);
+            }
         } catch (err) {
             console.log("Error fetching children:", err);
+            setChildren([]);
         } finally {
             setLoading(false);
         }
@@ -35,9 +41,10 @@ const ParentDashboard = ({ navigation }) => {
         setModalVisible(true);
         try {
             const res = await parentApi.getAttendance(child._id);
-            setAttendance(res.data);
+            const { success, data } = res.data || {};
+            setAttendance(success && Array.isArray(data) ? data : []);
         } catch (error) {
-            console.log("Error fetching attendance:", error);
+            console.log("Error fetching attendance:", error.message);
             setAttendance([]);
         }
     };

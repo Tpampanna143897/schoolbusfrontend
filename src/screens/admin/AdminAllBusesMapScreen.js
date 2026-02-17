@@ -29,8 +29,9 @@ const AdminAllBusesMapScreen = ({ navigation }) => {
     // HANDLE INCOMING UPDATES
     useEffect(() => {
         const cleanup = onLocationUpdate((data) => {
+            const incomingTripId = data.tripId?.toString();
             setTrips(prev => prev.map(trip => {
-                if (trip._id == data.tripId) {
+                if (trip._id?.toString() === incomingTripId) {
                     return {
                         ...trip,
                         location: {
@@ -63,14 +64,22 @@ const AdminAllBusesMapScreen = ({ navigation }) => {
     const fetchTrips = async () => {
         try {
             const res = await adminApi.getLiveTrips();
-            setTrips(res.data || []);
+            console.log("[FLEET ADMIN] Fetch result:", res.data);
 
-            // Adjust map to fit all buses if available
-            if (res.data && res.data.length > 0) {
-                setTimeout(() => fitMap(res.data), 1000);
+            const { success, data } = res.data || {};
+            if (success && Array.isArray(data)) {
+                setTrips(data);
+                // Adjust map to fit all buses if available
+                if (data.length > 0) {
+                    setTimeout(() => fitMap(data), 500);
+                }
+            } else {
+                console.warn("[FLEET ADMIN] API Success false or data not array:", res.data?.message);
+                setTrips([]);
             }
         } catch (err) {
-            console.log("Error fetching trips:", err);
+            console.error("[FLEET ADMIN] Fetch Error:", err.message);
+            setTrips([]);
         } finally {
             setLoading(false);
         }

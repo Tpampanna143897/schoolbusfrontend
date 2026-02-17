@@ -76,14 +76,20 @@ const TrackMapScreen = ({ route, navigation }) => {
     const fetchInitialLocation = async (id) => {
         try {
             const res = await client.get(`/parent/bus-location/${id}`);
-            if (res.data && typeof res.data.lat === 'number') {
-                setBusLocation({ latitude: res.data.lat, longitude: res.data.lng });
-                setSpeed(res.data.speed || 0);
-                setLastUpdated(new Date(res.data.timestamp || Date.now()).toLocaleTimeString());
-                if (res.data.type) setMode(res.data.type);
+            const { success, data } = res.data || {};
+
+            if (success && data && typeof data.lat === 'number') {
+                setBusLocation({ latitude: data.lat, longitude: data.lng });
+                setSpeed(data.speed || 0);
+                setLastUpdated(new Date(data.timestamp || data.time || Date.now()).toLocaleTimeString());
+                if (data.type) setMode(data.type);
+            } else {
+                console.log("[TRACK] No initial location:", res.data?.message || "Bus offline");
+                setBusLocation(null);
             }
         } catch (err) {
-            console.log("Error fetching initial location", err.message);
+            console.log("[TRACK] Error fetching initial location:", err.message);
+            setBusLocation(null);
         } finally {
             setLoading(false);
         }

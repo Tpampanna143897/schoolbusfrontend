@@ -21,9 +21,11 @@ const ParentCalendarScreen = ({ route }) => {
     const fetchHistory = async () => {
         try {
             const res = await parentApi.getAttendanceHistory(studentId);
-            setHistory(res.data || []);
+            const { success, data } = res.data || {};
+            setHistory(success && Array.isArray(data) ? data : []);
         } catch (error) {
-            console.error(error);
+            console.error("Fetch History Error:", error.message);
+            setHistory([]);
         } finally {
             setLoading(false);
         }

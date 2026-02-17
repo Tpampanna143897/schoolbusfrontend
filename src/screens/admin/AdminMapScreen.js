@@ -24,42 +24,70 @@ const AdminMapScreen = ({ route, navigation }) => {
     const [lastUpdated, setLastUpdated] = useState("");
     const [loading, setLoading] = useState(true);
 
-    const { connectionStatus, onLocationUpdate, joinBus, isConnected } = useTrackingSocket("ADMIN");
+    const { connectionStatus, onLocationUpdate, onOfflineUpdate, joinBus, joinTrip, isConnected } = useTrackingSocket("ADMIN");
 
     useEffect(() => {
         fetchInitialLocation();
     }, []);
 
-    // JOIN BUS ROOM
+    // JOIN BUS & TRIP ROOMS
     useEffect(() => {
         if (trip.busId?._id) {
             joinBus(trip.busId._id);
         }
-    }, [trip.busId?._id, connectionStatus, joinBus]);
+        if (trip._id) {
+            joinTrip(trip._id);
+        }
+    }, [trip.busId?._id, trip._id, connectionStatus, joinBus, joinTrip]);
 
     // HANDLE INCOMING UPDATES
     useEffect(() => {
-        const cleanup = onLocationUpdate((data) => {
-            if (data && data.tripId == trip._id && typeof data.lat === 'number') {
+        const cleanupLoc = onLocationUpdate((data) => {
+            const incomingTripId = data.tripId?.toString();
+            const currentTripId = trip._id?.toString();
+
+            if (incomingTripId === currentTripId && typeof data.lat === 'number') {
                 setBusLocation({ latitude: data.lat, longitude: data.lng });
                 setSpeed(data.speed || 0);
                 setHeading(data.heading || 0);
                 setLastUpdated(new Date(data.time || Date.now()).toLocaleTimeString());
             }
         });
-        return cleanup;
-    }, [trip._id, onLocationUpdate, isConnected]);
+
+        const cleanupOffline = onOfflineUpdate((data) => {
+            const incomingTripId = data.tripId?.toString();
+            const currentTripId = trip._id?.toString();
+
+            if (incomingTripId === currentTripId) {
+                setBusLocation(prev => prev ? { ...prev, status: 'offline' } : null);
+            }
+        });
+
+        return () => {
+            cleanupLoc();
+            cleanupOffline();
+        };
+    }, [trip._id, onLocationUpdate, onOfflineUpdate, isConnected]);
 
     const fetchInitialLocation = async () => {
         try {
-            const res = await adminApi.getTripLocation(trip._id);
-            if (res.data && typeof res.data.lat === 'number') {
-                setBusLocation({ latitude: res.data.lat, longitude: res.data.lng });
-                setSpeed(res.data.speed || 0);
-                setLastUpdated(new Date(res.data.timestamp || Date.now()).toLocaleTimeString());
+            const res = await client.get(`/tracking/live/${trip._id}`);
+            console.log("[ADMIN] Initial location fetch:", res.data);
+
+            const { success, data, message } = res.data || {};
+
+            if (success && data && typeof data.lat === 'number') {
+                setBusLocation({ latitude: data.lat, longitude: data.lng });
+                setSpeed(data.speed || 0);
+                setLastUpdated(new Date(data.timestamp || data.time || Date.now()).toLocaleTimeString());
+            } else {
+                console.log("[ADMIN] No live location found:", message || "Bus idle");
+                setBusLocation(null);
             }
         } catch (err) {
-            console.log("No initial location found for trip");
+            const errMsg = err.response?.data?.message || err.message;
+            console.error("[ADMIN] Error fetching initial location:", errMsg);
+            setBusLocation(null);
         } finally {
             setLoading(false);
         }

@@ -17,13 +17,16 @@ const ParentStudentDetails = ({ route, navigation }) => {
     const fetchAttendance = async () => {
         try {
             const res = await parentApi.getAttendance(student._id);
-            const data = Array.isArray(res.data) ? res.data : [];
+            const { success, data } = res.data || {};
+            const attendanceList = success && Array.isArray(data) ? data : [];
+
             // Simple summary logic: count pickup/drops
-            const pickup = data.filter(a => a.status === 'PICKED_UP').length;
-            const drop = data.filter(a => a.status === 'DROPPED_OFF').length;
-            setAttendanceSummary({ pickup, drop, total: data.length });
+            const pickup = attendanceList.filter(a => a.status === 'PICKED_UP' || a.status === 'PICKED').length;
+            const drop = attendanceList.filter(a => a.status === 'DROPPED_OFF' || a.status === 'DROPPED').length;
+            setAttendanceSummary({ pickup, drop, total: attendanceList.length });
         } catch (error) {
-            console.log("Error fetching attendance summary:", error);
+            console.log("Error fetching attendance summary:", error.message);
+            setAttendanceSummary({ pickup: 0, drop: 0, total: 0 });
         } finally {
             setLoading(false);
         }

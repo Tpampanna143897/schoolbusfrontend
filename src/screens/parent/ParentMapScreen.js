@@ -23,7 +23,7 @@ const ParentMapScreen = ({ route, navigation }) => {
     const [busLocation, setBusLocation] = useState(null);
     const [speed, setSpeed] = useState(0);
     const [heading, setHeading] = useState(0);
-    const { connectionStatus, onLocationUpdate, joinBus, joinTrip, isConnected } = useTrackingSocket("PARENT");
+    const { connectionStatus, onLocationUpdate, onOfflineUpdate, joinBus, joinTrip, isConnected } = useTrackingSocket("PARENT");
     const [lastUpdated, setLastUpdated] = useState("");
     const [loading, setLoading] = useState(true);
     const [mode, setMode] = useState('MORNING');
@@ -31,8 +31,15 @@ const ParentMapScreen = ({ route, navigation }) => {
     useEffect(() => {
         fetchInitialLocation();
 
-        const cleanup = onLocationUpdate((data) => {
-            const isMatch = (tripId && data.tripId == tripId) || (bus?._id && data.busId == bus._id);
+        const cleanupLoc = onLocationUpdate((data) => {
+            const incomingTripId = data.tripId?.toString();
+            const incomingBusId = data.busId?.toString();
+            const currentTripId = tripId?.toString();
+            const currentBusId = bus?._id?.toString();
+
+            const isMatch = (currentTripId && incomingTripId === currentTripId) ||
+                (currentBusId && incomingBusId === currentBusId);
+
             if (isMatch && typeof data.lat === 'number' && typeof data.lng === 'number') {
                 const newLoc = { latitude: data.lat, longitude: data.lng };
                 setBusLocation(newLoc);
@@ -43,10 +50,20 @@ const ParentMapScreen = ({ route, navigation }) => {
             }
         });
 
+        const cleanupOffline = onOfflineUpdate((data) => {
+            const incomingTripId = data.tripId?.toString();
+            const currentTripId = tripId?.toString();
+
+            if (incomingTripId === currentTripId) {
+                setBusLocation(prev => prev ? { ...prev, status: 'offline' } : null);
+            }
+        });
+
         return () => {
-            if (cleanup) cleanup();
+            cleanupLoc();
+            cleanupOffline();
         };
-    }, [tripId, bus?._id, onLocationUpdate, isConnected]);
+    }, [tripId, bus?._id, onLocationUpdate, onOfflineUpdate, isConnected]);
 
     // JOIN BUS & TRIP ROOMS FOR REAL-TIME UPDATES
     useEffect(() => {
@@ -56,32 +73,30 @@ const ParentMapScreen = ({ route, navigation }) => {
 
     const fetchInitialLocation = async () => {
         try {
-            let res;
-            if (tripId) {
-                res = await client.get(`/parent/trip-location/${tripId}`);
-            } else if (bus?._id) {
-                res = await client.get(`/parent/bus-location/${bus._id}`);
-            } else {
+            const id = tripId || bus?._id;
+            if (!id) {
                 setLoading(false);
                 return;
             }
 
-            if (res.data && typeof res.data.lat === 'number' && typeof res.data.lng === 'number') {
-                const loc = { latitude: res.data.lat, longitude: res.data.lng };
+            const res = await client.get(`/tracking/live/${id}`);
+            const { success, data, message } = res.data || {};
+
+            if (success && data && typeof data.lat === 'number') {
+                const loc = { latitude: data.lat, longitude: data.lng };
                 setBusLocation(loc);
-                setSpeed(res.data.speed || 0);
-                setLastUpdated(new Date(res.data.timestamp || Date.now()).toLocaleTimeString());
-                if (res.data.type) setMode(res.data.type); // type is the field name in Trip model
-            } else if (res.data && res.data.status === "offline") {
-                console.log("Bus is currently offline.");
+                setSpeed(data.speed || 0);
+                setLastUpdated(new Date(data.timestamp || data.time || Date.now()).toLocaleTimeString());
+                if (data.type) setMode(data.type);
+            } else {
+                console.log("[PARENT] No live location:", message || "Bus idle");
                 setBusLocation(null);
             }
         } catch (err) {
-            if (err.response && err.response.status === 404) {
-                console.log("No location data found yet - bus might be starting or offline");
-            } else {
-                console.log("Error fetching location:", err.message);
-            }
+            const errMsg = err.response?.data?.message || err.message;
+            console.log("[PARENT] Error fetching location:", errMsg);
+            // Handle 404/500 gracefully
+            setBusLocation(null);
         } finally {
             setLoading(false);
         }

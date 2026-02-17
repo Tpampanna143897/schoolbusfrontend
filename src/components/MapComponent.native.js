@@ -205,6 +205,18 @@ const MapComponent = ({
         };
     }, [busLocation, buses]);
 
+    const currentRegion = useMemo(() => {
+        if (followsBus && busLocation && typeof busLocation.latitude === 'number' && !isNaN(busLocation.latitude)) {
+            return {
+                latitude: busLocation.latitude,
+                longitude: busLocation.longitude,
+                latitudeDelta: 0.005,
+                longitudeDelta: 0.005,
+            };
+        }
+        return undefined; // Let internal state handle it if not following
+    }, [busLocation, followsBus]);
+
     return (
         <View style={styles.container}>
             <MapView
@@ -212,6 +224,7 @@ const MapComponent = ({
                 style={styles.map}
                 provider={PROVIDER_GOOGLE}
                 initialRegion={initialRegion}
+                region={currentRegion}
                 onTouchStart={() => setFollowsBus(false)}
                 showsUserLocation={isDriver}
                 followsUserLocation={isDriver && followsBus}

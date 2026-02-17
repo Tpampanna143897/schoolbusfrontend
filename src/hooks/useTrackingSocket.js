@@ -109,10 +109,10 @@ export const useTrackingSocket = (role) => {
 
     const emitLocation = useCallback((data) => {
         // PRODUCTION SAFEGUARDS:
-        // 1. Only emit if app is ACTIVE (Foreground)
-        if (appState.current !== 'active') {
-            return false;
-        }
+        // 1. Only emit if app is ACTIVE (Foreground) - REMOVED for background tracking support
+        // if (appState.current !== 'active') {
+        //     return false;
+        // }
 
         const { lat, lng, tripId, busId, driverId } = data;
 
@@ -136,10 +136,25 @@ export const useTrackingSocket = (role) => {
 
     const onLocationUpdate = useCallback((callback) => {
         if (socketRef.current) {
-            socketRef.current.on("trip-location", callback);
+            const wrappedCallback = (data) => {
+                // console.log(`[SOCKET] Received bus-location for Trip:${data.tripId}`);
+                callback(data);
+            };
+            socketRef.current.on("busLocation", wrappedCallback);
             return () => {
                 if (socketRef.current) {
-                    socketRef.current.off("trip-location", callback);
+                    socketRef.current.off("busLocation", wrappedCallback);
+                }
+            };
+        }
+    }, []);
+
+    const onOfflineUpdate = useCallback((callback) => {
+        if (socketRef.current) {
+            socketRef.current.on("busOffline", callback);
+            return () => {
+                if (socketRef.current) {
+                    socketRef.current.off("busOffline", callback);
                 }
             };
         }
@@ -153,6 +168,7 @@ export const useTrackingSocket = (role) => {
         joinAdmin,
         joinTrip,
         emitLocation,
-        onLocationUpdate
+        onLocationUpdate,
+        onOfflineUpdate
     };
 };

@@ -18,9 +18,17 @@ const AdminLiveTripsScreen = ({ navigation }) => {
     const fetchTrips = async () => {
         try {
             const res = await adminApi.getLiveTrips();
-            setTrips(Array.isArray(res.data) ? res.data : []);
+            const { success, data } = res.data || {};
+
+            if (success) {
+                setTrips(Array.isArray(data) ? data : []);
+            } else {
+                console.warn("[ADMIN JOURNEYS] API Success false:", res.data?.message);
+                setTrips([]);
+            }
         } catch (error) {
-            console.log("Error fetching live trips:", error);
+            console.error("[ADMIN JOURNEYS] Fetch error:", error.message);
+            setTrips([]);
         } finally {
             setLoading(false);
             setRefreshing(false);

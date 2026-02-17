@@ -7,10 +7,7 @@ import { storage } from "../utils/storage";
 // 3. For Android Emulator: Use 10.0.2.2
 // 4. For Web/Localhost: Use localhost
 
-// export const BASE_URL = "http://192.168.137.1:5000/api"; 
-// export const BASE_URL = "http://10.16.202.148:5000/api"; 
-// export const BASE_URL = "http://10.0.2.2:5000/api";
-// export const BASE_URL = "http://localhost:5000/api";
+// export const BASE_URL = "http://192.168.137.1:5000/api";
 export const BASE_URL = "https://schoolbusbackend-acx9.onrender.com/api";
 
 console.log("[API] Connecting to:", BASE_URL);

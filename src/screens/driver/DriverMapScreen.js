@@ -7,6 +7,7 @@ import * as Location from "expo-location";
 import { Ionicons } from "@expo/vector-icons";
 import MapComponent from "../../components/MapComponent";
 import { useTrackingSocket } from "../../hooks/useTrackingSocket";
+import { storage } from "../../utils/storage";
 
 // SecureStore removed (handled by cross-platform utility if needed)
 
@@ -182,6 +183,10 @@ const DriverMapScreen = ({ route, navigation }) => {
                 text: "End Trip", style: "destructive", onPress: async () => {
                     try {
                         await client.post('/driver/end-trip', { tripId });
+                        // Clear Background Session
+                        await storage.deleteItemAsync("active_trip_id");
+                        await storage.deleteItemAsync("active_bus_id");
+
                         stopTracking();
                         navigation.navigate("Main");
                     } catch (err) {

@@ -18,8 +18,9 @@ const StaffLiveTrackingScreen = ({ route }) => {
 
     useEffect(() => {
         const cleanup = onLocationUpdate((data) => {
+            const incomingTripId = data.tripId?.toString();
             setTrips(prev => prev.map(trip => {
-                if (trip._id == data.tripId) {
+                if (trip._id?.toString() === incomingTripId) {
                     return {
                         ...trip,
                         location: {
@@ -39,9 +40,18 @@ const StaffLiveTrackingScreen = ({ route }) => {
     const fetchTrips = async () => {
         try {
             const res = await adminApi.getLiveTrips();
-            setTrips(res.data || []);
+            console.log("[FLEET] Fetch result:", res.data);
+
+            const { success, data } = res.data || {};
+            if (success) {
+                setTrips(data || []);
+            } else {
+                console.warn("[FLEET] API Success false:", res.data?.message);
+                setTrips([]);
+            }
         } catch (error) {
-            console.error(error);
+            console.error("[FLEET] Fetch Error:", error.message);
+            setTrips([]);
         } finally {
             setLoading(false);
         }

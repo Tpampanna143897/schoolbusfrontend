@@ -24,7 +24,9 @@ export const AuthProvider = ({ children }) => {
                     // Fetch full user profile to populate context
                     try {
                         const res = await client.get("/auth/me");
-                        setUser(res.data);
+                        if (res.data?.success) {
+                            setUser(res.data.data);
+                        }
                     } catch (err) {
                         console.error("Failed to fetch profile during load", err);
                     }
@@ -42,16 +44,21 @@ export const AuthProvider = ({ children }) => {
         try {
             const res = await client.post("/auth/login", { email, password });
 
-            const { token, role, user } = res.data;
+            // Extract from the new {success, data} envelope
+            if (res.data?.success && res.data?.data) {
+                const { token, role, user } = res.data.data;
 
-            await storage.setItemAsync("token", token);
-            await storage.setItemAsync("role", role);
+                await storage.setItemAsync("token", token);
+                await storage.setItemAsync("role", role);
 
-            setToken(token);
-            setRole(role);
-            setUser(user);
+                setToken(token);
+                setRole(role);
+                setUser(user);
 
-            return { success: true };
+                return { success: true };
+            } else {
+                return { success: false, message: res.data?.message || "Invalid credentials" };
+            }
         } catch (error) {
             let errorMsg = "Login failed. Please try again.";
 

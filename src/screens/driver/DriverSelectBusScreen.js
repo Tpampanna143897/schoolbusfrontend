@@ -6,6 +6,7 @@ import * as Location from 'expo-location';
 import { driverApi } from '../../api/driverApi';
 import client from '../../api/client';
 import Dropdown from '../../components/Dropdown';
+import { storage } from '../../utils/storage';
 
 const DriverSelectBusScreen = ({ navigation }) => {
     const [buses, setBuses] = useState([]);
@@ -55,19 +56,23 @@ const DriverSelectBusScreen = ({ navigation }) => {
                 driverApi.getActiveTrip()
             ]);
 
-            const busList = Array.isArray(busRes.data) ? busRes.data : [];
-            const routeList = Array.isArray(routeRes.data) ? routeRes.data : [];
+            const busData = busRes.data || {};
+            const routeData = routeRes.data || {};
+            const activeData = activeRes.data || {};
 
-            if (activeRes.data && activeRes.data._id) {
-                console.log("Active trip detected in selection screen:", activeRes.data._id);
-                setHasActiveTrip(activeRes.data);
+            const busList = Array.isArray(busData.data) ? busData.data : [];
+            const routeList = Array.isArray(routeData.data) ? routeData.data : [];
+
+            if (activeData.success && activeData.data && activeData.data._id) {
+                console.log("Active trip detected in selection screen:", activeData.data._id);
+                setHasActiveTrip(activeData.data);
             }
 
             setBuses(busList);
             setRoutes(routeList);
 
             // Auto-select bus if only one and no active trip
-            if (busList.length === 1 && busList[0]?._id && !activeRes.data?._id) {
+            if (busList.length === 1 && busList[0]?._id && (!activeData.data || !activeData.data._id)) {
                 handleBusSelect(busList[0]._id, busList, routeList);
             }
         } catch (error) {
@@ -177,9 +182,18 @@ const DriverSelectBusScreen = ({ navigation }) => {
                 type: selectedMode
             });
 
+            const tripSessionId = res.data.data.tripId;
+            const busDataToStore = { ...selectedBus, route: selectedRoute };
+
+            // Persist for Background Task
+            await storage.setItemAsync("active_trip_id", tripSessionId);
+            await storage.setItemAsync("active_bus_id", selectedBusId);
+            const drId = res.data.data.driverId || '';
+            if (drId) await storage.setItemAsync("active_driver_id", drId);
+
             navigation.navigate("DriverMap", {
-                bus: { ...selectedBus, route: selectedRoute },
-                tripId: res.data.tripId,
+                bus: busDataToStore,
+                tripId: tripSessionId,
                 mode: selectedMode
             });
         } catch (error) {

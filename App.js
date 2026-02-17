@@ -8,6 +8,9 @@ import * as SplashScreen from "expo-splash-screen";
 import * as TaskManager from 'expo-task-manager';
 import * as Location from 'expo-location';
 import { Platform } from 'react-native';
+import axios from 'axios';
+import client from './src/api/client';
+import { storage } from './src/utils/storage';
 
 const isWeb = Platform.OS === 'web';
 const LOCATION_TASK_NAME = 'background-location-task';
@@ -21,7 +24,36 @@ if (!isWeb) {
     }
     if (data) {
       const { locations } = data;
-      console.log("[TASK_MANAGER] Received BG location update (Headless)");
+      const location = locations[0];
+      if (location) {
+        try {
+          // 1. Retrieve session from storage (Since headless tasks don't share React Context)
+          const tripId = await storage.getItemAsync("active_trip_id");
+          const busId = await storage.getItemAsync("active_bus_id");
+          const driverId = await storage.getItemAsync("active_driver_id");
+          const token = await storage.getItemAsync("token");
+
+          if (!tripId) return; // No active trip tracking needed
+
+          // 2. HTTP Fallback Emission (Sockets might be suspended in background)
+          // We use the same URL from client.js but via direct axios if needed, 
+          // or just the client instance if baseURL is already configured.
+          await axios.post(`${client.defaults.baseURL}/tracking/update`, {
+            tripId, busId, driverId,
+            lat: location.coords.latitude,
+            lng: location.coords.longitude,
+            speed: Math.max(0, Math.round((location.coords.speed || 0) * 3.6)),
+            heading: location.coords.heading || 0
+          }, {
+            headers: { Authorization: `Bearer ${token}` },
+            timeout: 10000
+          });
+
+          console.log(`[TASK_MANAGER] BG Hypersync: ${tripId} @ ${location.coords.latitude},${location.coords.longitude}`);
+        } catch (e) {
+          console.warn("[TASK_MANAGER] BG Sync Failed:", e.message);
+        }
+      }
     }
   });
 }
