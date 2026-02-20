@@ -11,7 +11,8 @@ const AdminRoutes = () => {
     const [modalVisible, setModalVisible] = useState(false);
 
     // Form state
-    const [name, setName] = useState('');
+    const [routeName, setRouteName] = useState('');
+    const [routeCode, setRouteCode] = useState('');
     const [stops, setStops] = useState('');
     const [polyline, setPolyline] = useState('');
 
@@ -23,7 +24,7 @@ const AdminRoutes = () => {
         setLoading(true);
         try {
             const res = await adminApi.getRoutes();
-            setRoutes(res.data);
+            setRoutes(res.data?.data || []);
         } catch (error) {
             Alert.alert('Error', 'Failed to fetch routes');
         } finally {
@@ -32,24 +33,30 @@ const AdminRoutes = () => {
     };
 
     const handleCreateRoute = async () => {
-        if (!name || !stops) {
-            Alert.alert('Error', 'Please fill required fields');
+        if (!routeName || !routeCode || !stops) {
+            Alert.alert('Error', 'Please fill required fields (Name, Code, Stops)');
             return;
         }
         try {
-            const stopsArray = stops.split(',').map(s => s.trim());
-            await adminApi.createRoute({ name, stops: stopsArray, polyline });
+            const stopsArray = stops.split(',').map((s, index) => ({
+                name: s.trim(),
+                lat: 0, // Placeholder, requires map picking in future
+                lng: 0,
+                order: index + 1
+            }));
+            await adminApi.createRoute({ routeName, routeCode, stops: stopsArray, polyline });
             Alert.alert('Success', 'Route created successfully');
             setModalVisible(false);
             resetForm();
             fetchRoutes();
         } catch (error) {
-            Alert.alert('Error', 'Failed to create route');
+            Alert.alert('Error', 'Failed to create route: ' + error.message);
         }
     };
 
     const resetForm = () => {
-        setName('');
+        setRouteName('');
+        setRouteCode('');
         setStops('');
         setPolyline('');
     };
@@ -68,10 +75,15 @@ const AdminRoutes = () => {
                     <View key={route._id} style={styles.routeCard}>
                         <View style={styles.routeHeader}>
                             <Ionicons name="trail-sign" size={24} color="#4c51bf" />
-                            <Text style={styles.routeName}>{route.name}</Text>
+                            <View style={{ marginLeft: 10 }}>
+                                <Text style={styles.routeName}>{route.routeName || route.name}</Text>
+                                <Text style={styles.routeCodeText}>Code: {route.routeCode || 'N/A'}</Text>
+                            </View>
                         </View>
                         <Text style={styles.stopsLabel}>Stops:</Text>
-                        <Text style={styles.stopsText}>{route.stops.join(' → ')}</Text>
+                        <Text style={styles.stopsText}>
+                            {route.stops?.map(s => typeof s === 'string' ? s : s.name).join(' → ')}
+                        </Text>
                         {route.polyline ? (
                             <View style={styles.badge}>
                                 <Ionicons name="map" size={12} color="#48bb78" />
@@ -93,7 +105,8 @@ const AdminRoutes = () => {
                         </View>
 
                         <ScrollView>
-                            <FormInput label="Route Name" value={name} onChangeText={setName} placeholder="e.g. Route #A-101" />
+                            <FormInput label="Route Name" value={routeName} onChangeText={setRouteName} placeholder="e.g. Downtown Express" />
+                            <FormInput label="Route Code" value={routeCode} onChangeText={setRouteCode} placeholder="e.g. RT-101" />
                             <FormInput
                                 label="Stops (Comma separated)"
                                 value={stops}

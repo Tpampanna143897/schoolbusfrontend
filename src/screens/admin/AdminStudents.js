@@ -9,6 +9,7 @@ import Dropdown from '../../components/Dropdown';
 const AdminStudents = () => {
     const [students, setStudents] = useState([]);
     const [parents, setParents] = useState([]);
+    const [schools, setSchools] = useState([]);
     const [routes, setRoutes] = useState([]);
     const [buses, setBuses] = useState([]);
     const [loading, setLoading] = useState(true);
@@ -18,6 +19,7 @@ const AdminStudents = () => {
     // Form state
     const [name, setName] = useState('');
     const [studentClass, setStudentClass] = useState('');
+    const [schoolId, setSchoolId] = useState('');
     const [parentId, setParentId] = useState('');
     const [assignedRouteId, setAssignedRouteId] = useState('');
     const [assignedBusId, setAssignedBusId] = useState('');
@@ -34,16 +36,18 @@ const AdminStudents = () => {
     const fetchInitialData = async () => {
         setLoading(true);
         try {
-            const [studentsRes, parentsRes, routesRes, busesRes] = await Promise.all([
+            const [studentsRes, parentsRes, schoolsRes, routesRes, busesRes] = await Promise.all([
                 adminApi.getStudents(),
                 adminApi.getUsers('PARENT'),
+                adminApi.getSchools(),
                 adminApi.getRoutes(),
                 adminApi.getBuses()
             ]);
-            setStudents(studentsRes.data || []);
-            setParents(parentsRes.data || []);
-            setRoutes(routesRes.data || []);
-            setBuses(busesRes.data || []);
+            setStudents(studentsRes.data?.data || []);
+            setParents(parentsRes.data?.data || []);
+            setSchools(schoolsRes.data?.data || []);
+            setRoutes(routesRes.data?.data || []);
+            setBuses(busesRes.data?.data || []);
         } catch (error) {
             Alert.alert('Error', 'Failed to fetch data');
         } finally {
@@ -60,6 +64,7 @@ const AdminStudents = () => {
             await adminApi.createStudent({
                 name,
                 class: studentClass,
+                schoolId: schoolId || null,
                 parent: parentId,
                 assignedRoute: assignedRouteId || null,
                 assignedBus: assignedBusId || null
@@ -97,6 +102,7 @@ const AdminStudents = () => {
     const resetForm = () => {
         setName('');
         setStudentClass('');
+        setSchoolId('');
         setParentId('');
         setAssignedRouteId('');
         setAssignedBusId('');
@@ -134,7 +140,7 @@ const AdminStudents = () => {
                         <View style={styles.detailsRow}>
                             <View style={styles.detail}>
                                 <Text style={styles.label}>Route</Text>
-                                <Text style={styles.value}>{student.assignedRoute?.name || 'Unassigned'}</Text>
+                                <Text style={styles.value}>{student.assignedRoute?.routeName || student.assignedRoute?.name || 'Unassigned'}</Text>
                             </View>
                             <View style={styles.detail}>
                                 <Text style={styles.label}>Bus</Text>
@@ -166,6 +172,13 @@ const AdminStudents = () => {
                             <FormInput label="Full Name" value={name} onChangeText={setName} />
                             <FormInput label="Grade/Class" value={studentClass} onChangeText={setStudentClass} />
                             <Dropdown
+                                label="School"
+                                selectedValue={schoolId}
+                                onValueChange={setSchoolId}
+                                items={schools.map(s => ({ id: s._id, label: s.name }))}
+                                placeholder="Select School"
+                            />
+                            <Dropdown
                                 label="Parent"
                                 selectedValue={parentId}
                                 onValueChange={setParentId}
@@ -176,7 +189,7 @@ const AdminStudents = () => {
                                 label="Primary Route"
                                 selectedValue={assignedRouteId}
                                 onValueChange={setAssignedRouteId}
-                                items={routes.map(r => ({ id: r._id, label: r.name }))}
+                                items={routes.map(r => ({ id: r._id, label: r.routeName || r.name }))}
                                 placeholder="Select Route"
                             />
                             <Dropdown
@@ -205,7 +218,7 @@ const AdminStudents = () => {
                             label="Change Route"
                             selectedValue={newRouteId}
                             onValueChange={setNewRouteId}
-                            items={routes.map(r => ({ id: r._id, label: r.name }))}
+                            items={routes.map(r => ({ id: r._id, label: r.routeName || r.name }))}
                         />
                         <Dropdown
                             label="Change Bus"

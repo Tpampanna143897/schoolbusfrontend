@@ -31,9 +31,9 @@ const AdminUsers = () => {
                 adminApi.getUsers('PARENT'),
                 adminApi.getUsers('STAFF')
             ]);
-            setDrivers(driversRes.data);
-            setParents(parentsRes.data);
-            setStaff(staffRes.data);
+            setDrivers(driversRes.data?.data || []);
+            setParents(parentsRes.data?.data || []);
+            setStaff(staffRes.data?.data || []);
         } catch (error) {
             Alert.alert('Error', 'Failed to fetch users');
         } finally {

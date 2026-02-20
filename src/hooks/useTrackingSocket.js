@@ -160,6 +160,28 @@ export const useTrackingSocket = (role) => {
         }
     }, []);
 
+    const onStopProgressed = useCallback((callback) => {
+        if (socketRef.current) {
+            socketRef.current.on("stopProgressed", callback);
+            return () => {
+                if (socketRef.current) {
+                    socketRef.current.off("stopProgressed", callback);
+                }
+            };
+        }
+    }, []);
+
+    const onAttendanceMarked = useCallback((callback) => {
+        if (socketRef.current) {
+            socketRef.current.on("attendanceMarked", callback);
+            return () => {
+                if (socketRef.current) {
+                    socketRef.current.off("attendanceMarked", callback);
+                }
+            };
+        }
+    }, []);
+
     return {
         socket: socketRef.current,
         connectionStatus,
@@ -169,6 +191,8 @@ export const useTrackingSocket = (role) => {
         joinTrip,
         emitLocation,
         onLocationUpdate,
-        onOfflineUpdate
+        onOfflineUpdate,
+        onStopProgressed,
+        onAttendanceMarked
     };
 };

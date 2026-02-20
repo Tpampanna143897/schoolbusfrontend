@@ -31,9 +31,9 @@ const AdminStaffManagementScreen = () => {
                 adminApi.getRoutes(),
                 adminApi.getBuses()
             ]);
-            setStaff(staffRes.data || []);
-            setRoutes(routeRes.data || []);
-            setBuses(busRes.data || []);
+            setStaff(staffRes.data?.data || []);
+            setRoutes(routeRes.data?.data || []);
+            setBuses(busRes.data?.data || []);
         } catch (error) {
             console.error("Fetch Error:", error);
             Alert.alert("Error", "Failed to fetch staff data");

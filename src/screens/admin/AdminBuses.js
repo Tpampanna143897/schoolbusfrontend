@@ -15,6 +15,8 @@ const AdminBuses = () => {
 
     // Form state
     const [busNumber, setBusNumber] = useState('');
+    const [vin, setVin] = useState('');
+    const [capacity, setCapacity] = useState('');
     const [defaultRouteId, setDefaultRouteId] = useState('');
 
     useEffect(() => {
@@ -28,8 +30,8 @@ const AdminBuses = () => {
                 adminApi.getBuses(),
                 adminApi.getRoutes(),
             ]);
-            setBuses(busesRes.data || []);
-            setRoutes(routesRes.data || []);
+            setBuses(busesRes.data?.data || []);
+            setRoutes(routesRes.data?.data || []);
         } catch (error) {
             console.error("Fetch Data Error:", error);
             Alert.alert('Error', 'Failed to fetch data');
@@ -75,6 +77,8 @@ const AdminBuses = () => {
         try {
             await adminApi.createBus({
                 busNumber,
+                vin,
+                capacity: parseInt(capacity),
                 defaultRoute: defaultRouteId || null,
                 isActive: true
             });
@@ -98,6 +102,8 @@ const AdminBuses = () => {
 
     const resetForm = () => {
         setBusNumber('');
+        setVin('');
+        setCapacity('');
         setDefaultRouteId('');
     };
 
@@ -143,7 +149,11 @@ const AdminBuses = () => {
 
                         <View style={styles.detailRow}>
                             <Ionicons name="map" size={16} color="#718096" />
-                            <Text style={styles.detailText}>Default Route: {bus.defaultRoute?.name || 'Not Configured'}</Text>
+                            <Text style={styles.detailText}>Default Route: {bus.defaultRoute?.routeName || bus.defaultRoute?.name || 'Not Configured'}</Text>
+                        </View>
+                        <View style={styles.infoRow}>
+                            <Text style={styles.infoLabel}>VIN: <Text style={styles.infoValue}>{bus.vin || 'N/A'}</Text></Text>
+                            <Text style={styles.infoLabel}>Cap: <Text style={styles.infoValue}>{bus.capacity || 'N/A'}</Text></Text>
                         </View>
 
                         {bus.activeTrip && (
@@ -182,13 +192,15 @@ const AdminBuses = () => {
 
                         <ScrollView>
                             <FormInput label="Bus Number" value={busNumber} onChangeText={setBusNumber} placeholder="e.g. S-BUS-012" />
+                            <FormInput label="VIN" value={vin} onChangeText={setVin} placeholder="Vehicle Identification Number" />
+                            <FormInput label="Capacity" value={capacity} onChangeText={setCapacity} placeholder="e.g. 40" keyboardType="numeric" />
 
                             <Dropdown
                                 label="Default Route (Optional)"
                                 selectedValue={defaultRouteId}
                                 onValueChange={setDefaultRouteId}
                                 placeholder="Select a fallback route"
-                                items={routes.map(r => ({ id: r._id, label: r.name }))}
+                                items={routes.map(r => ({ id: r._id, label: r.routeName || r.name }))}
                             />
 
                             <TouchableOpacity style={styles.submitBtn} onPress={handleCreateBus}>

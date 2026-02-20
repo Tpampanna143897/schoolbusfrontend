@@ -113,6 +113,10 @@ const AdminMapScreen = ({ route, navigation }) => {
                 lastUpdated={lastUpdated}
                 mode={trip.type || 'MORNING'}
                 routeStops={trip.routeId?.stops || []}
+                schoolLocation={trip.routeId?.schoolLocation ? {
+                    latitude: trip.routeId.schoolLocation.lat,
+                    longitude: trip.routeId.schoolLocation.lng
+                } : null}
             />
 
             <SafeAreaView style={styles.backBtnContainer} edges={['top']}>

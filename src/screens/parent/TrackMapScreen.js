@@ -22,12 +22,15 @@ const TrackMapScreen = ({ route, navigation }) => {
     const [lastUpdated, setLastUpdated] = useState("");
     const [loading, setLoading] = useState(true);
     const [mode, setMode] = useState('MORNING');
+    const [nextStop, setNextStop] = useState(null);
+    const [eta, setEta] = useState(null);
+    const [tripId, setTripId] = useState(null);
 
     if (!busId && !route.params?.busId) {
         // We will try to fetchMyBus if no ID is passed
     }
 
-    const { connectionStatus, onLocationUpdate, joinBus, joinTrip, isConnected } = useTrackingSocket("PARENT");
+    const { connectionStatus, onLocationUpdate, joinBus, joinTrip, isConnected, onStopProgressed } = useTrackingSocket("PARENT");
 
     useEffect(() => {
         if (!busId) {
@@ -42,22 +45,48 @@ const TrackMapScreen = ({ route, navigation }) => {
     useEffect(() => {
         if (busId) {
             joinBus(busId);
-            // Also join by trip if we have an active trip ID (though here we mostly have busId)
         }
     }, [busId, connectionStatus, joinBus]);
+
+    // JOIN TRIP ROOM whenever tripId changes
+    useEffect(() => {
+        if (tripId) {
+            joinTrip(tripId);
+        }
+    }, [tripId, joinTrip]);
 
     // HANDLE INCOMING UPDATES
     useEffect(() => {
         const cleanup = onLocationUpdate((data) => {
-            if (data && data.busId == busId && typeof data.lat === 'number' && typeof data.lng === 'number') {
+            if (data && (data.busId == busId || data.tripId == tripId) && typeof data.lat === 'number' && typeof data.lng === 'number') {
                 const newLoc = { latitude: data.lat, longitude: data.lng };
                 setBusLocation(newLoc);
                 setSpeed(data.speed || 0);
                 setLastUpdated(new Date(data.time || Date.now()).toLocaleTimeString());
+
+                // Real-time ETA/Next Stop updates from location payload
+                if (data.nextStop) setNextStop(data.nextStop);
+                if (data.eta !== undefined) setEta(data.eta);
+                if (data.tripId && !tripId) setTripId(data.tripId);
             }
         });
         return cleanup;
-    }, [busId, onLocationUpdate, isConnected]);
+    }, [busId, tripId, onLocationUpdate, isConnected]);
+
+    // HANDLE STOP PROGRESSION EVENTS
+    useEffect(() => {
+        if (!tripId) return;
+
+        const stopSub = onStopProgressed((data) => {
+            console.log("[SOCKET] Stop Progressed:", data);
+            // Optionally fetch fresh remaining stops list if needed
+        });
+
+        return () => {
+            if (stopSub) stopSub();
+        };
+    }, [tripId, onStopProgressed]);
+
 
     const fetchMyBus = async () => {
         try {
@@ -83,6 +112,10 @@ const TrackMapScreen = ({ route, navigation }) => {
                 setSpeed(data.speed || 0);
                 setLastUpdated(new Date(data.timestamp || data.time || Date.now()).toLocaleTimeString());
                 if (data.type) setMode(data.type);
+                if (data.tripId) {
+                    setTripId(data.tripId);
+                    fetchProgression(data.tripId);
+                }
             } else {
                 console.log("[TRACK] No initial location:", res.data?.message || "Bus offline");
                 setBusLocation(null);
@@ -92,6 +125,18 @@ const TrackMapScreen = ({ route, navigation }) => {
             setBusLocation(null);
         } finally {
             setLoading(false);
+        }
+    };
+
+    const fetchProgression = async (tId) => {
+        try {
+            const res = await client.get(`/parent/trip-progression/${tId}`);
+            if (res.data?.success) {
+                setNextStop(res.data.data.nextStop?.name);
+                setEta(res.data.data.eta);
+            }
+        } catch (err) {
+            console.log("[TRACK] Error fetching progression:", err.message);
         }
     };
 
@@ -115,6 +160,10 @@ const TrackMapScreen = ({ route, navigation }) => {
                 lastUpdated={lastUpdated}
                 mode={mode}
                 routeStops={busDetails?.route?.stops || []}
+                schoolLocation={busDetails?.route?.schoolLocation ? {
+                    latitude: busDetails.route.schoolLocation.lat,
+                    longitude: busDetails.route.schoolLocation.lng
+                } : null}
             />
 
             {/* Floating Back Button */}
@@ -128,16 +177,27 @@ const TrackMapScreen = ({ route, navigation }) => {
             <View style={styles.bottomSheet}>
                 <View style={styles.dragHandle} />
                 <View style={styles.cardHeader}>
-                    <View>
+                    <View style={{ flex: 1 }}>
                         <Text style={styles.busTitle}>{busDetails ? busDetails.busNumber : "School Bus"}</Text>
                         <Text style={styles.statusText}>
                             {busLocation ? "● Tracking Live" : "● Searching for location..."}
                         </Text>
                     </View>
-                    <View style={styles.ratingBox}>
-                        <Text style={styles.ratingText}>Active</Text>
-                    </View>
+                    {eta !== null && (
+                        <View style={styles.etaContainer}>
+                            <Text style={styles.etaValue}>{eta}</Text>
+                            <Text style={styles.etaLabel}>MIN</Text>
+                        </View>
+                    )}
                 </View>
+
+                {nextStop && (
+                    <View style={styles.nextStopContainer}>
+                        <Ionicons name="location" size={18} color="#4c51bf" />
+                        <Text style={styles.nextStopLabel}>Next Stop:</Text>
+                        <Text style={styles.nextStopValue}>{nextStop}</Text>
+                    </View>
+                )}
 
                 <View style={styles.divider} />
 
@@ -224,6 +284,43 @@ const styles = StyleSheet.create({
         padding: 12,
         borderRadius: 25,
         elevation: 2,
+    },
+    etaContainer: {
+        backgroundColor: "#4c51bf",
+        paddingHorizontal: 16,
+        paddingVertical: 8,
+        borderRadius: 12,
+        alignItems: "center",
+    },
+    etaValue: {
+        color: "white",
+        fontSize: 18,
+        fontWeight: "bold",
+    },
+    etaLabel: {
+        color: "rgba(255,255,255,0.8)",
+        fontSize: 10,
+        fontWeight: "600",
+    },
+    nextStopContainer: {
+        flexDirection: "row",
+        alignItems: "center",
+        backgroundColor: "#f7fafc",
+        padding: 12,
+        borderRadius: 12,
+        marginTop: 16,
+    },
+    nextStopLabel: {
+        fontSize: 14,
+        color: "#718096",
+        marginLeft: 8,
+    },
+    nextStopValue: {
+        fontSize: 14,
+        fontWeight: "bold",
+        color: "#2d3748",
+        marginLeft: 5,
+        flex: 1,
     },
 });
 

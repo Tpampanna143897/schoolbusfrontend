@@ -87,9 +87,11 @@ const MapComponent = ({
     mode = 'MORNING', // MORNING or EVENING
     buses = [], // [{ id, location: { latitude, longitude }, heading, busNumber }] for multi-tracking
     onBusPress, // Callback for when a bus is clicked in fleet mode
+    schoolLocation = null, // Dynamic School Location prop { latitude, longitude }
+    landmarks = [], // [{ latitude, longitude, title, type: 'SCHOOL' | 'START' | 'END' }]
 }) => {
-    // School Location (Replace with actual if needed)
-    const SCHOOL_LOCATION = { latitude: 12.9716, longitude: 77.5946 }; // Example Bangalore coordinate
+    // Default to the provided schoolLocation or a Bangalore center as absolute fallback
+    const ACTIVE_SCHOOL_LOCATION = schoolLocation || { latitude: 12.9716, longitude: 77.5946 };
     const mapRef = useRef(null);
     const [followsBus, setFollowsBus] = useState(true);
     const [displayRoute, setDisplayRoute] = useState(showRoute);
@@ -107,7 +109,15 @@ const MapComponent = ({
 
     // Safety check for stops
     const validStops = useMemo(() => {
-        return (routeStops || []).filter(s => s && typeof s.lat === 'number' && !isNaN(s.lat) && typeof s.lng === 'number' && !isNaN(s.lng));
+        return (routeStops || []).filter(s => {
+            const lat = s.lat !== undefined ? s.lat : s.latitude;
+            const lng = s.lng !== undefined ? s.lng : s.longitude;
+            return typeof lat === 'number' && !isNaN(lat) && typeof lng === 'number' && !isNaN(lng);
+        }).map(s => ({
+            name: s.name,
+            lat: s.lat !== undefined ? s.lat : s.latitude,
+            lng: s.lng !== undefined ? s.lng : s.longitude
+        }));
     }, [routeStops]);
 
     // DIRECTIONAL LOGIC
@@ -118,18 +128,18 @@ const MapComponent = ({
             // MORNING: Route Stops -> School
             return {
                 origin: { latitude: validStops[0].lat, longitude: validStops[0].lng },
-                destination: SCHOOL_LOCATION,
+                destination: ACTIVE_SCHOOL_LOCATION,
                 waypoints: validStops.slice(1).map(s => ({ latitude: s.lat, longitude: s.lng }))
             };
         } else {
             // EVENING: School -> Route Stops
             return {
-                origin: SCHOOL_LOCATION,
+                origin: ACTIVE_SCHOOL_LOCATION,
                 destination: { latitude: validStops[validStops.length - 1].lat, longitude: validStops[validStops.length - 1].lng },
                 waypoints: validStops.slice(0, -1).map(s => ({ latitude: s.lat, longitude: s.lng }))
             };
         }
-    }, [validStops, mode]);
+    }, [validStops, mode, ACTIVE_SCHOOL_LOCATION]);
 
     // Smooth Animated Coordinate state for SINGLE bus mode
     const [animatedCoordinate] = useState(new AnimatedRegion({
@@ -277,22 +287,54 @@ const MapComponent = ({
                     </Marker>
                 ))}
 
-                {/* School Marker */}
-                <Marker
-                    coordinate={SCHOOL_LOCATION}
-                    title="School"
-                    description="Drop-off/Pick-up point"
-                >
-                    <View style={styles.schoolMarker}>
-                        <Ionicons name="school" size={24} color="white" />
-                    </View>
-                </Marker>
+                {/* School Marker - Only show if specifically provided and valid */}
+                {schoolLocation && typeof schoolLocation.latitude === 'number' && typeof schoolLocation.longitude === 'number' && (
+                    <Marker
+                        coordinate={ACTIVE_SCHOOL_LOCATION}
+                        title="School"
+                        description="Drop-off/Pick-up point"
+                    >
+                        <View style={styles.schoolMarker}>
+                            <Ionicons name="school" size={24} color="white" />
+                        </View>
+                    </Marker>
+                )}
+
+                {/* Additional Landmarks (Start/End/Shared Schools) */}
+                {landmarks.map((mark, idx) => {
+                    const hasValidCoords = typeof mark.latitude === 'number' && !isNaN(mark.latitude) &&
+                        typeof mark.longitude === 'number' && !isNaN(mark.longitude);
+                    if (!hasValidCoords) return null;
+
+                    return (
+                        <Marker
+                            key={`landmark-${idx}`}
+                            coordinate={{ latitude: mark.latitude, longitude: mark.longitude }}
+                            title={mark.title}
+                            description={mark.type}
+                        >
+                            <View style={[
+                                styles.landmarkMarker,
+                                mark.type === 'START' && { backgroundColor: '#48bb78' }, // Green for Start
+                                mark.type === 'END' && { backgroundColor: '#e53e3e' }, // Red for End
+                                mark.type === 'SCHOOL' && { backgroundColor: '#FC8019' }, // Orange for School
+                            ]}>
+                                <Ionicons
+                                    name={mark.type === 'SCHOOL' ? 'school' : 'location'}
+                                    size={18}
+                                    color="white"
+                                />
+                            </View>
+                        </Marker>
+                    );
+                })}
 
                 {/* Single Bus Marker Mode */}
                 {!buses.length && busLocation && typeof busLocation.latitude === 'number' && !isNaN(busLocation.latitude) && (
                     <Marker.Animated
                         coordinate={animatedCoordinate}
                         title={busDetails?.busNumber || "School Bus"}
+                        description={busDetails?.route?.routeName || busDetails?.route?.name || "No route assigned"}
                         flat
                         anchor={{ x: 0.5, y: 0.5 }}
                         rotation={typeof heading === 'number' ? heading : 0}
@@ -504,6 +546,16 @@ const styles = StyleSheet.create({
         backgroundColor: '#4c51bf',
         borderWidth: 1,
         borderColor: 'white'
+    },
+    landmarkMarker: {
+        padding: 6,
+        borderRadius: 15,
+        borderWidth: 2,
+        borderColor: 'white',
+        elevation: 5,
+        shadowColor: "#000",
+        shadowOpacity: 0.3,
+        shadowRadius: 3
     }
 });
 

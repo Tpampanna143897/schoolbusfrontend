@@ -169,6 +169,10 @@ const DriverSelectBusScreen = ({ navigation }) => {
         try {
             setStartingTrip(true);
 
+            // Fetch current location for initial tracking point
+            const loc = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced });
+            const { latitude, longitude } = loc.coords;
+
             // 3) Lock bus so only one driver can activate it
             await driverApi.selectBus({
                 busId: selectedBusId,
@@ -179,7 +183,9 @@ const DriverSelectBusScreen = ({ navigation }) => {
             const res = await driverApi.startTrip({
                 busId: selectedBusId,
                 routeId: selectedRouteId,
-                type: selectedMode
+                type: selectedMode,
+                latitude,
+                longitude
             });
 
             const tripSessionId = res.data.data.tripId;
@@ -261,7 +267,7 @@ const DriverSelectBusScreen = ({ navigation }) => {
                         selectedValue={selectedRouteId}
                         onValueChange={handleRouteSelect}
                         placeholder="Choose a route..."
-                        items={routes.map(r => ({ id: r._id, label: r.name }))}
+                        items={routes.map(r => ({ id: r._id, label: r.routeName || r.name }))}
                     />
 
                     <Dropdown
@@ -310,7 +316,7 @@ const DriverSelectBusScreen = ({ navigation }) => {
                     <View style={styles.previewCard}>
                         <View style={styles.previewHeader}>
                             <Ionicons name="trail-sign" size={24} color="#48bb78" />
-                            <Text style={styles.routeName}>{selectedRoute.name}</Text>
+                            <Text style={styles.routeName}>{selectedRoute.routeName || selectedRoute.name}</Text>
                         </View>
 
                         <View style={styles.stopsContainer}>
@@ -320,7 +326,9 @@ const DriverSelectBusScreen = ({ navigation }) => {
                                         <View style={[styles.dot, index === 0 && styles.firstDot]} />
                                         {index < selectedRoute.stops.length - 1 && <View style={styles.line} />}
                                     </View>
-                                    <Text style={styles.stopLabel}>{stop}</Text>
+                                    <Text style={styles.stopLabel}>
+                                        {typeof stop === 'string' ? stop : (stop.name || 'Unnamed Stop')}
+                                    </Text>
                                 </View>
                             ))}
                         </View>

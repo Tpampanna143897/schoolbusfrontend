@@ -19,8 +19,10 @@ const DriverMapScreen = ({ route, navigation }) => {
     const [speed, setSpeed] = useState(0);
     const [heading, setHeading] = useState(0);
     const { user } = useContext(AuthContext);
-    const { connectionStatus, emitLocation } = useTrackingSocket("DRIVER");
+    const { connectionStatus, emitLocation, joinTrip, onStopProgressed } = useTrackingSocket("DRIVER");
     const [lastUpdated, setLastUpdated] = useState("");
+    const [nextStop, setNextStop] = useState(null);
+    const [eta, setEta] = useState(null);
     const lastEmitRef = useRef(0);
 
     const locationSubscription = useRef(null);
@@ -33,13 +35,20 @@ const DriverMapScreen = ({ route, navigation }) => {
             return;
         }
 
+        joinTrip(tripId);
         startLocationTracking();
+
+        const stopSub = onStopProgressed((data) => {
+            console.log("[DRIVER] Stop Progressed:", data);
+            // Data format: { nextStopIndex, lastVisitedStop }
+        });
 
         const subscription = AppState.addEventListener("change", handleAppStateChange);
 
         return () => {
             stopTracking();
             subscription.remove();
+            if (stopSub) stopSub();
         };
     }, []);
 
@@ -251,12 +260,13 @@ const DriverMapScreen = ({ route, navigation }) => {
                         <Ionicons name="bus" size={20} color="white" />
                     </View>
                     <View style={{ flex: 1, marginLeft: 12 }}>
-                        <Text style={styles.stopAddress}>{bus?.busNumber} Tracking</Text>
-                        <View style={[styles.badge, { backgroundColor: isPaused ? '#fffaf0' : '#f0fff4' }]}>
-                            <Text style={[styles.badgeText, { color: isPaused ? '#c05621' : '#2f855a' }]}>
-                                {isPaused ? "Session Paused" : "Journey Active"}
-                            </Text>
-                        </View>
+                        <Text style={styles.stopLabel}>NEXT STOP</Text>
+                        <Text style={styles.stopAddress}>{nextStop || "Calculating..."}</Text>
+                        {eta !== null && (
+                            <View style={styles.etaBadge}>
+                                <Text style={styles.etaText}>Arriving in {eta} min</Text>
+                            </View>
+                        )}
                     </View>
                 </View>
             </View>

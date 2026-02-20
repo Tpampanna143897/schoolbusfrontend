@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useRef } from "react";
+import React, { useEffect, useState, useRef, useMemo } from "react";
 import { View, StyleSheet, Text, ActivityIndicator, TouchableOpacity, Image } from "react-native";
 // Map imports handled by MapComponent
 import io from "socket.io-client";
@@ -49,14 +49,39 @@ const AdminAllBusesMapScreen = ({ navigation }) => {
     }, [onLocationUpdate, isConnected]);
 
     const fitMap = (currentTrips) => {
-        const coords = currentTrips
-            .filter(t => t.location && typeof t.location.lat === 'number' && !isNaN(t.location.lat))
+        const busCoords = currentTrips
+            .filter(t => t.location && typeof t.location.lat === 'number' && !isNaN(t.location.lat) && t.location.lat !== 0)
             .map(t => ({ latitude: t.location.lat, longitude: t.location.lng }));
 
-        if (coords.length > 0) {
-            mapRef.current?.fitToCoordinates(coords, {
+        const routeCoords = [];
+        currentTrips.forEach(t => {
+            if (t.routeId?.stops?.length > 0) {
+                const stops = t.routeId.stops;
+                routeCoords.push({ latitude: stops[0].lat, longitude: stops[0].lng });
+                routeCoords.push({ latitude: stops[stops.length - 1].lat, longitude: stops[stops.length - 1].lng });
+            }
+            if (t.routeId?.schoolLocation?.lat) {
+                routeCoords.push({
+                    latitude: t.routeId.schoolLocation.lat,
+                    longitude: t.routeId.schoolLocation.lng
+                });
+            }
+        });
+
+        const allCoords = [...busCoords, ...routeCoords];
+
+        if (allCoords.length > 0) {
+            mapRef.current?.fitToCoordinates(allCoords, {
                 edgePadding: { top: 100, right: 100, bottom: 100, left: 100 },
                 animated: true,
+            });
+        } else {
+            // Default center if no data (Bangalore)
+            mapRef.current?.animateToRegion({
+                latitude: 12.9716,
+                longitude: 77.5946,
+                latitudeDelta: 0.1,
+                longitudeDelta: 0.1
             });
         }
     };
@@ -87,13 +112,57 @@ const AdminAllBusesMapScreen = ({ navigation }) => {
 
     // Map all active trips to the "buses" format for the smooth multi-marker support
     const displayBuses = trips
-        .filter(t => t && t.location && typeof t.location.lat === 'number' && !isNaN(t.location.lat))
+        .filter(t => t && t.location && typeof t.location.lat === 'number' && !isNaN(t.location.lat) && t.location.lat !== 0)
         .map(t => ({
             id: t._id,
             location: { latitude: t.location.lat, longitude: t.location.lng },
             heading: t.location.heading || 0,
             busNumber: t.busId?.busNumber || "Bus"
         }));
+
+    // Generate unique landmarks for all active routes
+    const fleetLandmarks = useMemo(() => {
+        const marks = [];
+        const added = new Set();
+
+        trips.forEach(t => {
+            if (t.routeId?.stops?.length > 0) {
+                const stops = t.routeId.stops;
+                const start = stops[0];
+                const end = stops[stops.length - 1];
+
+                if (start && typeof start.lat === 'number' && typeof start.lng === 'number') {
+                    const startKey = `START-${start.lat}-${start.lng}`;
+                    if (!added.has(startKey)) {
+                        marks.push({ latitude: start.lat, longitude: start.lng, title: 'Route Start', type: 'START' });
+                        added.add(startKey);
+                    }
+                }
+
+                if (end && typeof end.lat === 'number' && typeof end.lng === 'number') {
+                    const endKey = `END-${end.lat}-${end.lng}`;
+                    if (!added.has(endKey)) {
+                        marks.push({ latitude: end.lat, longitude: end.lng, title: 'Route End', type: 'END' });
+                        added.add(endKey);
+                    }
+                }
+            }
+            if (t.routeId?.schoolLocation?.lat && typeof t.routeId.schoolLocation.lat === 'number') {
+                const sch = t.routeId.schoolLocation;
+                const schKey = `SCHOOL-${sch.lat}-${sch.lng}`;
+                if (!added.has(schKey)) {
+                    marks.push({
+                        latitude: sch.lat,
+                        longitude: sch.lng,
+                        title: 'School',
+                        type: 'SCHOOL'
+                    });
+                    added.add(schKey);
+                }
+            }
+        });
+        return marks;
+    }, [trips]);
 
     if (loading) return (
         <View style={styles.center}>
@@ -105,7 +174,9 @@ const AdminAllBusesMapScreen = ({ navigation }) => {
     return (
         <View style={styles.container}>
             <MapComponent
+                ref={mapRef}
                 buses={displayBuses}
+                landmarks={fleetLandmarks}
                 connectionStatus={trips.length > 0 ? `Fleet: ${trips.length} Active` : "Scanning Fleet..."}
                 onBusPress={(bus) => {
                     const trip = trips.find(t => t._id === bus.id);
